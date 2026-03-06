@@ -8,7 +8,8 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json(accounts)
+    console.log('Fetched accounts:', accounts)
+    return NextResponse.json(accounts || [])
   } catch (error) {
     console.error('Failed to fetch sender accounts:', error)
     return NextResponse.json(

@@ -35,9 +35,12 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/sender-accounts')
       const data = await res.json()
-      setAccounts(data)
+      console.log('Loaded accounts:', data)
+      // Ensure data is always an array
+      setAccounts(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Failed to load accounts:', error)
+      setAccounts([])
     } finally {
       setLoading(false)
     }
