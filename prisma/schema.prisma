@@ -337,7 +337,7 @@ model UnsubscribeRecord {
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   customerEmail  String
   customerId     String?
-  customer       Customer? @relation(fields: [customerId], references: [id])
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   campaignId     String?
   reason         String?
   feedback       String?
