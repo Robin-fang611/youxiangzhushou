@@ -381,7 +381,24 @@ export async function createCampaign(
 
     const name = campaignName || `营销活动 ${new Date().toLocaleString('zh-CN')}`
 
-    const tempUserId = 'temp-user-id'
+    let tempUserId = 'temp-user-id'
+    
+    let user = await prisma.user.findUnique({
+      where: { email: 'system@local.dev' }
+    })
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          id: 'temp-user-id',
+          email: 'system@local.dev',
+          password: 'temp-password-hash',
+          name: 'System User'
+        }
+      })
+    } else {
+      tempUserId = user.id
+    }
     
     const createdCustomers = await Promise.all(
       contacts.map(contact => 

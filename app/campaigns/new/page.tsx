@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseFile, createCampaign, startCampaign } from '../../actions'
-import { Upload, FileText, Send, ChevronRight, Loader2, AlertCircle } from 'lucide-react'
+import { Upload, FileText, Send, ChevronRight, Loader2, AlertCircle, Mail } from 'lucide-react'
 
 interface Customer {
   email: string
