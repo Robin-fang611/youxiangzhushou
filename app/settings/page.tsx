@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Mail, CheckCircle, XCircle, Save, X } from 'lucide-react'
-import { prisma } from '@/lib/prisma'
 
 interface SenderAccount {
   id: string
