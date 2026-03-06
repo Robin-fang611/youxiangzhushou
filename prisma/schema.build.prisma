@@ -1,0 +1,15 @@
+// This is your Prisma schema file for Vercel deployment
+// This file will be used during build time
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Use SQLite for build time (no database connection needed)
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Production will use PostgreSQL via environment variables
+// This is just for build-time Prisma Client generation
