@@ -8,8 +8,8 @@ generator client {
 // Use PostgreSQL for Vercel deployment
 datasource db {
   provider = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  url       = env("A_DATABASE_URL")
+  directUrl = env("A_DIRECT_DATABASE_URL")
 }
 
 // ==================== 用户系统 ====================
