@@ -251,6 +251,9 @@ async function parseExcelFile(file: File): Promise<any[]> {
   console.log('[parseExcelFile] 解析完成，有效联系人:', result.length)
   
   return result
+} catch (error) {
+  console.error('[parseExcelFile] 解析失败:', error)
+  throw new Error(`Excel 文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
 }
 
 async function parseCSVFileWithHeader(file: File): Promise<any[]> {
