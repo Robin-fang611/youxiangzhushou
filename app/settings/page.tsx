@@ -34,10 +34,14 @@ export default function SettingsPage() {
   async function loadAccounts() {
     try {
       const res = await fetch('/api/sender-accounts')
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`)
+      }
       const data = await res.json()
       console.log('Loaded accounts:', data)
-      // Ensure data is always an array
-      setAccounts(Array.isArray(data) ? data : [])
+      // 确保数据总是数组格式
+      const accountsData = Array.isArray(data) ? data : []
+      setAccounts(accountsData)
     } catch (error) {
       console.error('Failed to load accounts:', error)
       setAccounts([])

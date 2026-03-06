@@ -8,8 +8,10 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     })
 
-    console.log('Fetched accounts:', accounts)
-    return NextResponse.json(accounts || [])
+    // 确保总是返回数组，即使是 null 或 undefined
+    const result = Array.isArray(accounts) ? accounts : []
+    console.log('Fetched accounts:', result)
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Failed to fetch sender accounts:', error)
     return NextResponse.json(
