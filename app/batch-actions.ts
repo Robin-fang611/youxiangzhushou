@@ -101,7 +101,7 @@ export async function sendCampaignInBatches(campaignId: string) {
     return {
       success: true,
       total: totalContacts,
-      success: successCount,
+      sent: successCount,
       failed: failedCount,
       batches: totalBatches
     }
