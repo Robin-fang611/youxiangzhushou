@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getAllCampaigns, deleteCampaign } from '../actions'
+import { useRouter } from 'next/navigation'
+import { getAllCampaigns, deleteCampaign, startCampaign } from '../actions'
 import { Plus, Play, Trash2, CheckCircle, XCircle, Clock, Loader2, Eye, Mail, BarChart3 } from 'lucide-react'
 
 interface Campaign {
@@ -28,6 +29,8 @@ const statusConfig = {
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
+  const [startingId, setStartingId] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
     loadCampaigns()
@@ -49,6 +52,19 @@ export default function CampaignsPage() {
     } else {
       alert(result.error || '删除失败')
     }
+  }
+
+  const handleStart = async (id: string) => {
+    setStartingId(id)
+    const result = await startCampaign(id)
+    setStartingId(null)
+
+    if (result.success) {
+      router.push(`/campaigns/${id}/status`)
+      return
+    }
+
+    alert(result.error || '启动失败')
   }
 
   return (
@@ -226,13 +242,18 @@ export default function CampaignsPage() {
 
                     <div className="flex gap-2">
                       {campaign.status === 'DRAFT' && (
-                        <Link
-                          href={`/campaigns/${campaign.id}/start`}
+                        <button
+                          onClick={() => handleStart(campaign.id)}
+                          disabled={startingId === campaign.id}
                           className="p-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
                           title="开始发送"
                         >
-                          <Play className="w-5 h-5" />
-                        </Link>
+                          {startingId === campaign.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Play className="w-5 h-5" />
+                          )}
+                        </button>
                       )}
                       {campaign.status !== 'SENDING' && (
                         <button

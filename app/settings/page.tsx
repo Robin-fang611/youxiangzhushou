@@ -41,6 +41,7 @@ export default function SettingsPage() {
       console.log('Loaded accounts:', data)
       // 确保数据总是数组格式
       const accountsData = Array.isArray(data) ? data : []
+      console.log('Sanitized accounts data:', accountsData)
       setAccounts(accountsData)
     } catch (error) {
       console.error('Failed to load accounts:', error)
@@ -139,7 +140,7 @@ export default function SettingsPage() {
         {/* 邮箱列表 */}
         {loading ? (
           <div className="text-center py-12 text-[#86909c]">加载中...</div>
-        ) : accounts.length === 0 ? (
+        ) : !Array.isArray(accounts) || accounts.length === 0 ? (
           <div className="bg-white rounded-lg border border-[#dee0e3] p-12 text-center">
             <Mail className="w-16 h-16 text-[#dee0e3] mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-[#1f2329] mb-2">暂无发件邮箱</h3>
@@ -154,7 +155,7 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {accounts.map((account) => (
+            {Array.isArray(accounts) && accounts.map((account) => (
               <div
                 key={account.id}
                 className={`bg-white rounded-lg border-2 p-5 transition-all ${

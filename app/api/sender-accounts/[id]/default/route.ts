@@ -8,14 +8,25 @@ export async function POST(
   try {
     const { id } = params
 
-    // Set this account as default
+    const target = await prisma.senderAccount.findUnique({
+      where: { id },
+      select: { id: true, userId: true }
+    })
+
+    if (!target) {
+      return NextResponse.json(
+        { error: '发件账户不存在' },
+        { status: 404 }
+      )
+    }
+
     await prisma.senderAccount.updateMany({
-      where: {},
+      where: { userId: target.userId },
       data: { isDefault: false }
     })
 
     const account = await prisma.senderAccount.update({
-      where: { id },
+      where: { id: target.id },
       data: { isDefault: true }
     })
 

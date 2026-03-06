@@ -1,6 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import * as nodemailer from 'nodemailer'
+
+function normalizeSenderAccount(account: any) {
+  let smtpHost = ''
+  let smtpPort = 465
+  let smtpUser = ''
+  let smtpPass = ''
+  let smtpSecure = true
+
+  if (account?.smtpConfig) {
+    try {
+      const smtpConfig = JSON.parse(account.smtpConfig)
+      smtpHost = smtpConfig?.host || ''
+      smtpPort = Number(smtpConfig?.port) || 465
+      smtpUser = smtpConfig?.auth?.user || ''
+      smtpPass = smtpConfig?.auth?.pass || ''
+      smtpSecure = Boolean(smtpConfig?.secure)
+    } catch {
+      smtpHost = ''
+      smtpPort = 465
+      smtpUser = ''
+      smtpPass = ''
+      smtpSecure = true
+    }
+  }
+
+  return {
+    ...account,
+    smtpHost,
+    smtpPort,
+    smtpUser,
+    smtpPass,
+    smtpSecure
+  }
+}
 
 export async function GET() {
   try {
@@ -8,14 +41,19 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     })
 
-    // 确保总是返回数组，即使是 null 或 undefined
-    const result = Array.isArray(accounts) ? accounts : []
-    console.log('Fetched accounts:', result)
+    const result = Array.isArray(accounts) ? accounts.map(normalizeSenderAccount) : []
     return NextResponse.json(result)
   } catch (error) {
     console.error('Failed to fetch sender accounts:', error)
+    
+    // 返回更详细的错误信息（非生产环境或特定情况），方便调试
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    
     return NextResponse.json(
-      { error: 'Failed to fetch sender accounts' },
+      { 
+        error: 'Failed to fetch sender accounts',
+        details: errorMessage
+      },
       { status: 500 }
     )
   }

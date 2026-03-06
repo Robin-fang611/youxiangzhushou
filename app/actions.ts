@@ -73,33 +73,71 @@ async function parseCSVFile(file: File): Promise<any[]> {
   try {
     const text = await file.text()
     
-    // 自动检测分隔符：优先使用英文逗号，如果没有则尝试中文逗号
     const hasEnglishComma = text.includes(',')
     const hasChineseComma = text.includes('，')
     
     let delimiter = ','
     if (!hasEnglishComma && hasChineseComma) {
       delimiter = '，'
-      console.log('[parseCSVFile] 检测到中文逗号分隔符')
     }
     
     const result = Papa.parse(text, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
       encoding: 'UTF-8',
       delimiter: delimiter,
-      fastMode: true // 启用快速模式，提升性能
+      fastMode: true
     } as Papa.ParseConfig)
-    
-    console.log('[parseCSVFile] CSV 解析结果:', result.data)
-    
-    // 检查解析错误
+
     if (result.errors && result.errors.length > 0) {
-      console.error('[parseCSVFile] 解析错误:', result.errors)
       throw new Error(`CSV 解析失败：${result.errors[0].message}`)
     }
-    
-    return result.data as any[]
+
+    const rows = result.data as any[]
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return []
+    }
+
+    const normalizedRows = rows
+      .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell ?? '').trim()) : []))
+      .filter((row) => row.some((cell) => cell.length > 0))
+
+    if (normalizedRows.length === 0) {
+      return []
+    }
+
+    const firstRow = normalizedRows[0]
+    const hasHeader = firstRow.some((cell) => {
+      const lower = cell.toLowerCase()
+      return lower.includes('email') || lower.includes('邮箱') || lower.includes('mail')
+    })
+
+    if (hasHeader) {
+      const emailIndex = firstRow.findIndex((cell) => {
+        const lower = cell.toLowerCase()
+        return lower.includes('email') || lower.includes('邮箱') || lower.includes('mail')
+      })
+      const nameIndex = firstRow.findIndex((cell) => {
+        const lower = cell.toLowerCase()
+        return lower.includes('name') || lower.includes('姓名') || lower.includes('fullname')
+      })
+      const companyIndex = firstRow.findIndex((cell) => {
+        const lower = cell.toLowerCase()
+        return lower.includes('company') || lower.includes('公司') || lower.includes('corp')
+      })
+
+      return normalizedRows.slice(1).map((row) => ({
+        email: emailIndex >= 0 ? row[emailIndex] || '' : '',
+        name: nameIndex >= 0 ? row[nameIndex] || '' : '',
+        company: companyIndex >= 0 ? row[companyIndex] || '' : ''
+      }))
+    }
+
+    return normalizedRows.map((row) => ({
+      email: row.find((cell) => validateEmail(cell)) || '',
+      name: row[0] || '',
+      company: row[2] || ''
+    }))
   } catch (error) {
     console.error('[parseCSVFile] 解析失败:', error)
     throw new Error(`文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
@@ -257,28 +295,6 @@ async function parseExcelFile(file: File): Promise<any[]> {
   }
 }
 
-async function parseCSVFileWithHeader(file: File): Promise<any[]> {
-  try {
-    const text = await file.text()
-    const result = Papa.parse(text, {
-      header: true,
-      skipEmptyLines: true,
-      encoding: 'UTF-8'
-    } as Papa.ParseConfig)
-    
-    // 检查解析错误
-    if (result.errors && result.errors.length > 0) {
-      console.error('[parseCSVFileWithHeader] 解析错误:', result.errors)
-      throw new Error(`CSV 解析失败：${result.errors[0].message}`)
-    }
-    
-    return result.data as any[]
-  } catch (error) {
-    console.error('[parseCSVFileWithHeader] 解析失败:', error)
-    throw new Error(`文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
-  }
-}
-
 function getFieldValue(row: any, candidates: string[]): string | undefined {
   for (const key of candidates) {
     if (row[key] !== undefined && row[key] !== null) {
@@ -312,7 +328,7 @@ export async function parseFile(formData: FormData): Promise<ParseResult> {
     let rawData: any[] = []
 
     if (file.name.endsWith('.csv')) {
-      rawData = await parseCSVFileWithHeader(file)
+      rawData = await parseCSVFile(file)
     } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
       rawData = await parseExcelFile(file)
     } else {
@@ -429,12 +445,30 @@ export async function createCampaign(
       tempUserId = user.id
     }
     
+    const dedupedContacts = Array.from(
+      new Map(
+        contacts
+          .filter(contact => contact.email && validateEmail(contact.email))
+          .map(contact => [contact.email.trim().toLowerCase(), contact])
+      ).values()
+    )
+
     const createdCustomers = await Promise.all(
-      contacts.map(contact => 
-        prisma.customer.create({
-          data: {
+      dedupedContacts.map(contact =>
+        prisma.customer.upsert({
+          where: {
+            userId_email: {
+              userId: tempUserId,
+              email: contact.email.trim().toLowerCase()
+            }
+          },
+          update: {
+            name: contact.name || '',
+            company: contact.company || ''
+          },
+          create: {
             userId: tempUserId,
-            email: contact.email,
+            email: contact.email.trim().toLowerCase(),
             name: contact.name || '',
             company: contact.company || ''
           }
@@ -475,7 +509,7 @@ export async function createCampaign(
         subject,
         body,
         status: 'DRAFT',
-        totalRecipients: contacts.length,
+        totalRecipients: createdCustomers.length,
         contacts: {
           create: createdCustomers.map(customer => ({
             customerId: customer.id,
