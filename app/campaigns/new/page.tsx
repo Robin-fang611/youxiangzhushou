@@ -104,6 +104,24 @@ export default function NewCampaignPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white border-b border-[#dee0e3] sticky top-0 z-50">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-lg font-semibold text-[#1f2329]">新建活动</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <a href="/" className="text-[#86909c] hover:text-[#3370ff]">首页</a>
+              <a href="/campaigns" className="text-[#86909c] hover:text-[#3370ff]">活动</a>
+              <a href="/campaigns/new" className="text-[#3370ff] font-medium">新建</a>
+              <a href="/settings" className="text-[#86909c] hover:text-[#3370ff]">设置</a>
+            </div>
+          </div>
+        </div>
+      </nav>
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="mb-8">

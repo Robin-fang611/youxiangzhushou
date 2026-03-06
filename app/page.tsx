@@ -18,6 +18,12 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               <Link 
+                href="/settings" 
+                className="text-[#86909c] hover:text-[#3370ff]"
+              >
+                邮箱设置
+              </Link>
+              <Link 
                 href="/test" 
                 className="bg-[#00b365] hover:bg-[#009152] text-white px-5 py-2 rounded-md text-sm font-medium inline-flex items-center gap-2 transition-all"
               >
