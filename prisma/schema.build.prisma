@@ -5,10 +5,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Use SQLite for build time (no database connection needed)
+// Use PostgreSQL for Vercel deployment
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ==================== 用户系统 ====================
