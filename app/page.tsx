@@ -19,8 +19,9 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <Link 
                 href="/settings" 
-                className="text-[#86909c] hover:text-[#3370ff]"
+                className="bg-white hover:border-[#3370ff] hover:text-[#3370ff] text-[#1f2329] px-5 py-2 rounded-md text-sm font-medium inline-flex items-center gap-2 transition-all border border-[#dee0e3]"
               >
+                <Mail className="w-4 h-4" />
                 邮箱设置
               </Link>
               <Link 
@@ -69,12 +70,40 @@ export default function Home() {
               查看历史活动
             </Link>
           </div>
+          
+          {/* 快捷设置入口 */}
+          <div className="flex justify-center gap-3 mt-6">
+            <Link
+              href="/settings"
+              className="bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-[#3370ff] px-6 py-2.5 rounded-md text-sm font-medium inline-flex items-center gap-2 transition-all border border-blue-200"
+            >
+              <Mail className="w-4 h-4" />
+              配置发件邮箱
+            </Link>
+          </div>
         </div>
 
         {/* 快速入门三步曲 */}
         <div className="max-w-6xl mx-auto mb-16">
           <h2 className="text-3xl font-bold text-[#1f2329] mb-10 text-center">快速入门</h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-4 gap-6">
+            <div className="bg-white rounded-lg border border-[#dee0e3] p-8 hover:shadow-lg transition-all hover:-translate-y-1">
+              <div className="flex items-center justify-between mb-6">
+                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Mail className="w-6 h-6 text-[#3370ff]" />
+                </div>
+                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-[#3370ff] font-bold">0</div>
+              </div>
+              <h3 className="text-xl font-semibold text-[#1f2329] mb-3">配置邮箱</h3>
+              <p className="text-[#86909c] mb-5 leading-relaxed">
+                添加 SMTP 发件邮箱，支持多邮箱切换
+              </p>
+              <Link href="/settings" className="text-[#3370ff] hover:text-[#2860e1] font-medium inline-flex items-center gap-1.5 text-sm">
+                立即配置
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            
             <div className="bg-white rounded-lg border border-[#dee0e3] p-8 hover:shadow-lg transition-all hover:-translate-y-1">
               <div className="flex items-center justify-between mb-6">
                 <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -94,16 +123,16 @@ export default function Home() {
             
             <div className="bg-white rounded-lg border border-[#dee0e3] p-8 hover:shadow-lg transition-all hover:-translate-y-1">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
-                  <Edit className="w-6 h-6 text-[#00b365]" />
+                <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                  <Edit className="w-6 h-6 text-[#3370ff]" />
                 </div>
-                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center text-[#00b365] font-bold">2</div>
+                <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-[#3370ff] font-bold">2</div>
               </div>
               <h3 className="text-xl font-semibold text-[#1f2329] mb-3">撰写邮件内容</h3>
               <p className="text-[#86909c] mb-5 leading-relaxed">
                 使用变量实现个性化，让每封邮件都独一无二
               </p>
-              <Link href="/campaigns/new" className="text-[#00b365] hover:text-[#009152] font-medium inline-flex items-center gap-1.5 text-sm">
+              <Link href="/campaigns/new" className="text-[#3370ff] hover:text-[#2860e1] font-medium inline-flex items-center gap-1.5 text-sm">
                 学习技巧
                 <ArrowRight className="w-4 h-4" />
               </Link>
