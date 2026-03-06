@@ -246,7 +246,7 @@ async function parseCSVFileWithHeader(file: File): Promise<any[]> {
     header: true,
     skipEmptyLines: true,
     encoding: 'UTF-8'
-  })
+  } as Papa.ParseConfig)
   return result.data as any[]
 }
 
