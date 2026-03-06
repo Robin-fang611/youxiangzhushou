@@ -381,11 +381,13 @@ export async function createCampaign(
 
     const name = campaignName || `营销活动 ${new Date().toLocaleString('zh-CN')}`
 
-    // 先创建所有客户
+    const tempUserId = 'temp-user-id'
+    
     const createdCustomers = await Promise.all(
       contacts.map(contact => 
         prisma.customer.create({
           data: {
+            userId: tempUserId,
             email: contact.email,
             name: contact.name || '',
             company: contact.company || ''
@@ -394,10 +396,36 @@ export async function createCampaign(
       )
     )
 
-    // 然后创建活动及其关联
+    const tempTemplate = await prisma.emailTemplate.create({
+      data: {
+        userId: tempUserId,
+        name: `模板-${name}`,
+        subject: subject,
+        content: body,
+        plainText: body,
+        variables: '[]'
+      }
+    })
+
+    const tempSenderAccount = await prisma.senderAccount.create({
+      data: {
+        userId: tempUserId,
+        name: '默认发件账户',
+        email: process.env.QQ_EMAIL || 'default@example.com',
+        smtpConfig: JSON.stringify({
+          host: 'smtp.qq.com',
+          port: 465,
+          secure: true
+        })
+      }
+    })
+
     const campaign = await prisma.campaign.create({
       data: {
+        userId: tempUserId,
         name,
+        templateId: tempTemplate.id,
+        senderAccountId: tempSenderAccount.id,
         subject,
         body,
         status: 'DRAFT',
