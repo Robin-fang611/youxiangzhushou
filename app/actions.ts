@@ -86,9 +86,9 @@ async function parseCSVFile(file: File): Promise<any[]> {
     header: true,
     skipEmptyLines: true,
     encoding: 'UTF-8',
-    delimiter: delimiter as string,
+    delimiter: delimiter,
     fastMode: true // 启用快速模式，提升性能
-  })
+  } as Papa.ParseConfig)
   
   console.log('[parseCSVFile] CSV 解析结果:', result.data)
   return result.data as any[]
