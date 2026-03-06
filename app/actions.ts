@@ -70,71 +70,84 @@ export interface SendResult {
 }
 
 async function parseCSVFile(file: File): Promise<any[]> {
-  const text = await file.text()
-  
-  // 自动检测分隔符：优先使用英文逗号，如果没有则尝试中文逗号
-  const hasEnglishComma = text.includes(',')
-  const hasChineseComma = text.includes('，')
-  
-  let delimiter = ','
-  if (!hasEnglishComma && hasChineseComma) {
-    delimiter = '，'
-    console.log('[parseCSVFile] 检测到中文逗号分隔符')
+  try {
+    const text = await file.text()
+    
+    // 自动检测分隔符：优先使用英文逗号，如果没有则尝试中文逗号
+    const hasEnglishComma = text.includes(',')
+    const hasChineseComma = text.includes('，')
+    
+    let delimiter = ','
+    if (!hasEnglishComma && hasChineseComma) {
+      delimiter = '，'
+      console.log('[parseCSVFile] 检测到中文逗号分隔符')
+    }
+    
+    const result = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: 'UTF-8',
+      delimiter: delimiter,
+      fastMode: true // 启用快速模式，提升性能
+    } as Papa.ParseConfig)
+    
+    console.log('[parseCSVFile] CSV 解析结果:', result.data)
+    
+    // 检查解析错误
+    if (result.errors && result.errors.length > 0) {
+      console.error('[parseCSVFile] 解析错误:', result.errors)
+      throw new Error(`CSV 解析失败：${result.errors[0].message}`)
+    }
+    
+    return result.data as any[]
+  } catch (error) {
+    console.error('[parseCSVFile] 解析失败:', error)
+    throw new Error(`文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
   }
-  
-  const result = Papa.parse(text, {
-    header: true,
-    skipEmptyLines: true,
-    encoding: 'UTF-8',
-    delimiter: delimiter,
-    fastMode: true // 启用快速模式，提升性能
-  } as Papa.ParseConfig)
-  
-  console.log('[parseCSVFile] CSV 解析结果:', result.data)
-  return result.data as any[]
 }
 
 async function parseExcelFile(file: File): Promise<any[]> {
-  console.log('[parseExcelFile] 开始解析文件:', file.name)
-  
-  const buffer = await file.arrayBuffer()
-  const workbook = read(buffer, { 
-    type: 'array',
-    cellStyles: false, // 不读取样式，提升性能
-    cellDates: false, // 不转换日期
-    cellFormula: false // 不读取公式
-  })
-  const sheetName = workbook.SheetNames[0]
-  const sheet = workbook.Sheets[sheetName]
-  
-  console.log('[parseExcelFile] 工作表名称:', sheetName)
-  
-  // 使用数组格式读取所有数据
-  const jsonData = utils.sheet_to_json(sheet, { 
-    header: 1,
-    defval: '' // 空单元格使用空字符串
-  }) as any[][]
-  
-  console.log('[parseExcelFile] 原始数据行数:', jsonData.length)
-  
-  if (jsonData.length === 0) {
-    console.log('[parseExcelFile] 数据为空')
-    return []
-  }
+  try {
+    console.log('[parseExcelFile] 开始解析文件:', file.name)
+    
+    const buffer = await file.arrayBuffer()
+    const workbook = read(buffer, { 
+      type: 'array',
+      cellStyles: false, // 不读取样式，提升性能
+      cellDates: false, // 不转换日期
+      cellFormula: false // 不读取公式
+    })
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    
+    console.log('[parseExcelFile] 工作表名称:', sheetName)
+    
+    // 使用数组格式读取所有数据
+    const jsonData = utils.sheet_to_json(sheet, { 
+      header: 1,
+      defval: '' // 空单元格使用空字符串
+    }) as any[][]
+    
+    console.log('[parseExcelFile] 原始数据行数:', jsonData.length)
+    
+    if (jsonData.length === 0) {
+      console.log('[parseExcelFile] 数据为空')
+      return []
+    }
 
-  // 检测第一行（可能是 header 或数据）
-  const firstRow = jsonData[0]
-  console.log('[parseExcelFile] 第一行数据:', firstRow)
-  
-  // 检查第一行是否包含邮箱格式的数据
-  const firstRowHasEmail = firstRow.some((cell: any) => {
-    const str = String(cell || '')
-    return str.includes('@') && validateEmail(str)
-  })
-  
-  console.log('[parseExcelFile] 第一行是否包含邮箱:', firstRowHasEmail)
-  
-  let dataRows = jsonData
+    // 检测第一行（可能是 header 或数据）
+    const firstRow = jsonData[0]
+    console.log('[parseExcelFile] 第一行数据:', firstRow)
+    
+    // 检查第一行是否包含邮箱格式的数据
+    const firstRowHasEmail = firstRow.some((cell: any) => {
+      const str = String(cell || '')
+      return str.includes('@') && validateEmail(str)
+    })
+    
+    console.log('[parseExcelFile] 第一行是否包含邮箱:', firstRowHasEmail)
+    
+    let dataRows = jsonData
   let headerRow: any[] = []
   let emailIndex = -1
   let nameIndex = 0
@@ -241,13 +254,25 @@ async function parseExcelFile(file: File): Promise<any[]> {
 }
 
 async function parseCSVFileWithHeader(file: File): Promise<any[]> {
-  const text = await file.text()
-  const result = Papa.parse(text, {
-    header: true,
-    skipEmptyLines: true,
-    encoding: 'UTF-8'
-  } as Papa.ParseConfig)
-  return result.data as any[]
+  try {
+    const text = await file.text()
+    const result = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: 'UTF-8'
+    } as Papa.ParseConfig)
+    
+    // 检查解析错误
+    if (result.errors && result.errors.length > 0) {
+      console.error('[parseCSVFileWithHeader] 解析错误:', result.errors)
+      throw new Error(`CSV 解析失败：${result.errors[0].message}`)
+    }
+    
+    return result.data as any[]
+  } catch (error) {
+    console.error('[parseCSVFileWithHeader] 解析失败:', error)
+    throw new Error(`文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
+  }
 }
 
 function getFieldValue(row: any, candidates: string[]): string | undefined {
