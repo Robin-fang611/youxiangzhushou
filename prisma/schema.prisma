@@ -96,10 +96,11 @@ model Customer {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   
-  tags              CustomerTag[]
-  groups            CustomerGroup[]
+  tags              CustomerTag[] @relation("CustomerTags")
+  groups            CustomerGroup[] @relation("CustomerGroups")
   campaigns         CampaignContact[]
   tracking          EmailTracking[]
+  unsubscribeRecords UnsubscribeRecord[]
   
   @@unique([userId, email])
   @@index([userId])
@@ -116,7 +117,7 @@ model CustomerTag {
   name        String
   color       String   @default("#3370ff")
   description String?
-  customers   Customer[]
+  customers   Customer[] @relation("CustomerTags")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -132,7 +133,7 @@ model CustomerGroup {
   description String?
   type        String   @default("MANUAL")
   filterRules String?
-  customers   Customer[]
+  customers   Customer[] @relation("CustomerGroups")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
