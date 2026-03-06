@@ -148,112 +148,113 @@ async function parseExcelFile(file: File): Promise<any[]> {
     console.log('[parseExcelFile] 第一行是否包含邮箱:', firstRowHasEmail)
     
     let dataRows = jsonData
-  let headerRow: any[] = []
-  let emailIndex = -1
-  let nameIndex = 0
-  let companyIndex = -1
-  
-  if (firstRowHasEmail) {
-    // 第一行就是数据，没有 header
-    console.log('[parseExcelFile] 第一行是数据，自动识别列')
+    let headerRow: any[] = []
+    let emailIndex = -1
+    let nameIndex = 0
+    let companyIndex = -1
     
-    // 扫描前 3 行数据找邮箱列
-    for (let i = 0; i < Math.min(jsonData.length, 3); i++) {
-      const row = jsonData[i]
-      for (let j = 0; j < row.length; j++) {
-        const cell = String(row[j] || '').trim()
-        if (cell.includes('@') && validateEmail(cell)) {
-          emailIndex = j
-          console.log('[parseExcelFile] 找到邮箱列索引:', j, '值:', cell)
-          break
+    if (firstRowHasEmail) {
+      // 第一行就是数据，没有 header
+      console.log('[parseExcelFile] 第一行是数据，自动识别列')
+      
+      // 扫描前 3 行数据找邮箱列
+      for (let i = 0; i < Math.min(jsonData.length, 3); i++) {
+        const row = jsonData[i]
+        for (let j = 0; j < row.length; j++) {
+          const cell = String(row[j] || '').trim()
+          if (cell.includes('@') && validateEmail(cell)) {
+            emailIndex = j
+            console.log('[parseExcelFile] 找到邮箱列索引:', j, '值:', cell)
+            break
+          }
         }
+        if (emailIndex !== -1) break
       }
-      if (emailIndex !== -1) break
+      
+      // 如果找到邮箱列，假设前一列是姓名，后一列是公司
+      if (emailIndex !== -1) {
+        nameIndex = emailIndex > 0 ? emailIndex - 1 : 0
+        companyIndex = emailIndex + 1
+        console.log('[parseExcelFile] 推断列索引 - 姓名:', nameIndex, '邮箱:', emailIndex, '公司:', companyIndex)
+      }
+    } else {
+      // 第一行是 header
+      console.log('[parseExcelFile] 第一行是 header')
+      headerRow = firstRow.map((h: any) => String(h).trim().toLowerCase())
+      dataRows = jsonData.slice(1)
+      
+      console.log('[parseExcelFile] Header 行:', headerRow)
+      
+      // 查找邮箱列
+      emailIndex = headerRow.findIndex((h: string) => 
+        h.includes('email') || h.includes('邮箱') || h.includes('mail') || h.includes('e-mail')
+      )
+      
+      // 查找姓名列
+      nameIndex = headerRow.findIndex((h: string) => 
+        h.includes('name') || h.includes('姓名') || h.includes('fullname')
+      )
+      
+      // 查找公司列
+      companyIndex = headerRow.findIndex((h: string) => 
+        h.includes('company') || h.includes('公司') || h.includes('corp') || h.includes('unit')
+      )
     }
     
-    // 如果找到邮箱列，假设前一列是姓名，后一列是公司
-    if (emailIndex !== -1) {
-      nameIndex = emailIndex > 0 ? emailIndex - 1 : 0
-      companyIndex = emailIndex + 1
-      console.log('[parseExcelFile] 推断列索引 - 姓名:', nameIndex, '邮箱:', emailIndex, '公司:', companyIndex)
-    }
-  } else {
-    // 第一行是 header
-    console.log('[parseExcelFile] 第一行是 header')
-    headerRow = firstRow.map((h: any) => String(h).trim().toLowerCase())
-    dataRows = jsonData.slice(1)
+    console.log('[parseExcelFile] 最终列索引 - 邮箱:', emailIndex, '姓名:', nameIndex, '公司:', companyIndex)
     
-    console.log('[parseExcelFile] Header 行:', headerRow)
-    
-    // 查找邮箱列
-    emailIndex = headerRow.findIndex((h: string) => 
-      h.includes('email') || h.includes('邮箱') || h.includes('mail') || h.includes('e-mail')
-    )
-    
-    // 查找姓名列
-    nameIndex = headerRow.findIndex((h: string) => 
-      h.includes('name') || h.includes('姓名') || h.includes('fullname')
-    )
-    
-    // 查找公司列
-    companyIndex = headerRow.findIndex((h: string) => 
-      h.includes('company') || h.includes('公司') || h.includes('corp') || h.includes('unit')
-    )
-  }
-  
-  console.log('[parseExcelFile] 最终列索引 - 邮箱:', emailIndex, '姓名:', nameIndex, '公司:', companyIndex)
-  
-  // 转换数据为对象数组
-  const result = []
-  for (let i = 0; i < dataRows.length; i++) {
-    const row = dataRows[i]
-    if (!row || row.length === 0) continue
+    // 转换数据为对象数组
+    const result = []
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i]
+      if (!row || row.length === 0) continue
 
-    const obj: any = {
-      name: '',  // 默认值为空字符串
-      company: '' // 默认值为空字符串
-    }
-    
-    // 获取邮箱
-    if (emailIndex !== -1 && row[emailIndex] !== undefined && row[emailIndex] !== null) {
-      const emailVal = String(row[emailIndex]).trim()
-      if (emailVal && validateEmail(emailVal)) {
-        obj.email = emailVal
-        console.log('[parseExcelFile] 行', i, '找到邮箱:', emailVal)
+      const obj: any = {
+        name: '',  // 默认值为空字符串
+        company: '' // 默认值为空字符串
+      }
+      
+      // 获取邮箱
+      if (emailIndex !== -1 && row[emailIndex] !== undefined && row[emailIndex] !== null) {
+        const emailVal = String(row[emailIndex]).trim()
+        if (emailVal && validateEmail(emailVal)) {
+          obj.email = emailVal
+          console.log('[parseExcelFile] 行', i, '找到邮箱:', emailVal)
+        } else {
+          console.log('[parseExcelFile] 行', i, '邮箱无效:', emailVal, '索引:', emailIndex)
+        }
       } else {
-        console.log('[parseExcelFile] 行', i, '邮箱无效:', emailVal, '索引:', emailIndex)
+        console.log('[parseExcelFile] 行', i, '邮箱索引无效或值为空 - 索引:', emailIndex, '值:', row[emailIndex])
       }
-    } else {
-      console.log('[parseExcelFile] 行', i, '邮箱索引无效或值为空 - 索引:', emailIndex, '值:', row[emailIndex])
-    }
-    
-    // 获取姓名（允许为空，使用空字符串）
-    if (nameIndex !== -1 && row[nameIndex] !== undefined && row[nameIndex] !== null) {
-      const nameVal = String(row[nameIndex]).trim()
-      obj.name = nameVal || ''
-    }
-    
-    // 获取公司（允许为空，使用空字符串）
-    if (companyIndex !== -1 && row[companyIndex] !== undefined && row[companyIndex] !== null) {
-      const companyVal = String(row[companyIndex]).trim()
-      obj.company = companyVal || ''
-    }
+      
+      // 获取姓名（允许为空，使用空字符串）
+      if (nameIndex !== -1 && row[nameIndex] !== undefined && row[nameIndex] !== null) {
+        const nameVal = String(row[nameIndex]).trim()
+        obj.name = nameVal || ''
+      }
+      
+      // 获取公司（允许为空，使用空字符串）
+      if (companyIndex !== -1 && row[companyIndex] !== undefined && row[companyIndex] !== null) {
+        const companyVal = String(row[companyIndex]).trim()
+        obj.company = companyVal || ''
+      }
 
-    // 如果找到了邮箱，添加到结果中
-    if (obj.email) {
-      result.push(obj)
-      console.log('[parseExcelFile] 添加联系人:', obj)
-    } else {
-      console.log('[parseExcelFile] 跳过无效行:', row, '原因：无有效邮箱')
+      // 如果找到了邮箱，添加到结果中
+      if (obj.email) {
+        result.push(obj)
+        console.log('[parseExcelFile] 添加联系人:', obj)
+      } else {
+        console.log('[parseExcelFile] 跳过无效行:', row, '原因：无有效邮箱')
+      }
     }
+    
+    console.log('[parseExcelFile] 解析完成，有效联系人:', result.length)
+    
+    return result
+  } catch (error) {
+    console.error('[parseExcelFile] 解析失败:', error)
+    throw new Error(`Excel 文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
   }
-  
-  console.log('[parseExcelFile] 解析完成，有效联系人:', result.length)
-  
-  return result
-} catch (error) {
-  console.error('[parseExcelFile] 解析失败:', error)
-  throw new Error(`Excel 文件解析失败：${error instanceof Error ? error.message : '未知错误'}`)
 }
 
 async function parseCSVFileWithHeader(file: File): Promise<any[]> {
