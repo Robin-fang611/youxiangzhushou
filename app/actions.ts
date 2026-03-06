@@ -86,7 +86,7 @@ async function parseCSVFile(file: File): Promise<any[]> {
     header: true,
     skipEmptyLines: true,
     encoding: 'UTF-8',
-    delimiter: delimiter,
+    delimiter: delimiter as string,
     fastMode: true // 启用快速模式，提升性能
   })
   
