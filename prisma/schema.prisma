@@ -1,0 +1,359 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ==================== 用户系统 ====================
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String
+  name              String?
+  avatar            String?
+  role              String   @default("USER")
+  status            String   @default("PENDING")
+  emailVerified     Boolean  @default(false)
+  emailVerifyToken  String?
+  emailVerifyExpiry DateTime?
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  lastLoginAt       DateTime?
+  loginCount        Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  sessions          Session[]
+  senderAccounts    SenderAccount[]
+  customers         Customer[]
+  customerTags      CustomerTag[]
+  customerGroups    CustomerGroup[]
+  emailTemplates    EmailTemplate[]
+  campaigns         Campaign[]
+  emailImages       EmailImage[]
+  unsubscribeRecords UnsubscribeRecord[]
+  userSettings      UserSettings?
+  
+  @@index([email])
+  @@index([status])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
+
+model UserSettings {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme          String   @default("light")
+  language       String   @default("zh-CN")
+  timezone       String   @default("Asia/Shanghai")
+  emailSignature String?
+  autoSave       Boolean  @default(true)
+  notifyOnReply  Boolean  @default(true)
+  notifyOnBounce Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ==================== 客户管理 ====================
+
+model Customer {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email             String
+  name              String?
+  company           String?
+  phone             String?
+  industry          String?
+  region            String?
+  customerType      String   @default("NEW")
+  cooperationLevel  String   @default("MEDIUM")
+  lastContactDate   DateTime?
+  totalEmailsSent   Int      @default(0)
+  totalEmailsOpened Int      @default(0)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  tags              CustomerTag[]
+  groups            CustomerGroup[]
+  campaigns         CampaignContact[]
+  tracking          EmailTracking[]
+  
+  @@unique([userId, email])
+  @@index([userId])
+  @@index([email])
+  @@index([customerType])
+  @@index([region])
+  @@index([industry])
+}
+
+model CustomerTag {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  color       String   @default("#3370ff")
+  description String?
+  customers   Customer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model CustomerGroup {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  type        String   @default("MANUAL")
+  filterRules String?
+  customers   Customer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// ==================== 邮件模板 ====================
+
+model EmailTemplate {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  subject      String
+  content      String
+  plainText    String?
+  category     String   @default("DEVELOPMENT")
+  customerType String?
+  variables    String
+  thumbnail    String?
+  isPublic     Boolean  @default(false)
+  usageCount   Int      @default(0)
+  lastUsedAt   DateTime?
+  campaigns    Campaign[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([category])
+  @@index([customerType])
+}
+
+// ==================== 发件邮箱账户 ====================
+
+model SenderAccount {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  smtpConfig  String
+  status      String   @default("ACTIVE")
+  isDefault   Boolean  @default(false)
+  dailyLimit  Int      @default(500)
+  dailySent   Int      @default(0)
+  reputation  String   @default("GOOD")
+  lastError   String?
+  lastUsedAt  DateTime?
+  campaigns   Campaign[]
+  preferences String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, email])
+  @@index([userId])
+}
+
+// ==================== 邮件发送任务 ====================
+
+model Campaign {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  templateId        String
+  template          EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  senderAccountId   String
+  senderAccount     SenderAccount @relation(fields: [senderAccountId], references: [id], onDelete: Cascade)
+  subject           String
+  body              String
+  scheduleConfig    String?
+  frequencyLimit    String?
+  retryConfig       String?
+  status            String   @default("DRAFT")
+  totalRecipients   Int      @default(0)
+  sentCount         Int      @default(0)
+  successCount      Int      @default(0)
+  failedCount       Int      @default(0)
+  openedCount       Int      @default(0)
+  clickedCount      Int      @default(0)
+  unsubscribedCount Int      @default(0)
+  progress          Int      @default(0)
+  startedAt         DateTime?
+  completedAt       DateTime?
+  contacts          CampaignContact[]
+  logs              CampaignLog[]
+  analytics         CampaignAnalytics?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([templateId])
+  @@index([senderAccountId])
+}
+
+model CampaignContact {
+  id         String   @id @default(cuid())
+  campaignId String
+  customerId String
+  email      String
+  name       String?
+  company    String?
+  status     String   @default("PENDING")
+  sentAt     DateTime?
+  openedAt   DateTime?
+  clickedAt  DateTime?
+  errorMsg   String?
+  retryCount Int      @default(0)
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+model CampaignLog {
+  id         String   @id @default(cuid())
+  campaignId String
+  level      String   @default("INFO")
+  message    String
+  details    String?
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  @@index([campaignId])
+  @@index([createdAt])
+}
+
+// ==================== 邮件跟踪与分析 ====================
+
+model EmailTracking {
+  id          String   @id @default(cuid())
+  campaignId  String
+  recipientId String
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  eventType   String
+  eventData   String
+  timestamp   DateTime @default(now())
+  
+  @@index([campaignId])
+  @@index([customerId])
+  @@index([eventType])
+}
+
+model CampaignAnalytics {
+  id               String   @id @default(cuid())
+  campaignId       String   @unique
+  campaign         Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  totalSent        Int
+  delivered        Int
+  opened           Int
+  clicked          Int
+  bounced          Int
+  complained       Int
+  unsubscribed     Int
+  deliveryRate     Float
+  openRate         Float
+  clickRate        Float
+  clickThroughRate Float
+  bounceRate       Float
+  complaintRate    Float
+  unsubscribeRate  Float
+  hourlyStats      String?
+  dailyStats       String?
+  deviceStats      String?
+  locationStats    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ==================== 图片管理 ====================
+
+model EmailImage {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  thumbnailUrl String
+  width        Int
+  height       Int
+  usageCount   Int      @default(0)
+  tags         String?
+  uploadedAt   DateTime @default(now())
+  
+  @@index([userId])
+}
+
+// ==================== 退订记录 ====================
+
+model UnsubscribeRecord {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerEmail  String
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id])
+  campaignId     String?
+  reason         String?
+  feedback       String?
+  ipAddress      String?
+  unsubscribedAt DateTime  @default(now())
+  
+  @@index([userId])
+  @@index([customerEmail])
+}
+
+// ==================== 系统配置 ====================
+
+model SystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}

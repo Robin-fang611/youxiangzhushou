@@ -1,8 +1,64 @@
-node_modules/
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.local
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal
+
+# uploads
+/uploads/*
+!/uploads/.gitkeep
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Python (legacy)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
 dist/
 build/
-.env
-.env.local
-.vscode/
-.idea/
-*.log
+.venv/
+
+# Legacy backup
+/legacy_backup/

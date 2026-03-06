@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # ==================== 应用服务 ====================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: marketing-email-system
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/marketing_system?schema=public
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - MAIL_PROVIDER=${MAIL_PROVIDER}
+      - QQ_EMAIL=${QQ_EMAIL}
+      - QQ_SMTP_AUTH=${QQ_SMTP_AUTH}
+    depends_on:
+      - db
+      - redis
+    networks:
+      - marketing-network
+    volumes:
+      - ./uploads:/app/uploads
+
+  # ==================== 数据库服务 ====================
+  db:
+    image: postgres:15-alpine
+    container_name: marketing-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=marketing_system
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    networks:
+      - marketing-network
+
+  # ==================== Redis 缓存服务 ====================
+  redis:
+    image: redis:7-alpine
+    container_name: marketing-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - marketing-network
+
+  # ==================== Nginx 反向代理 ====================
+  nginx:
+    image: nginx:alpine
+    container_name: marketing-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    networks:
+      - marketing-network
+
+networks:
+  marketing-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
