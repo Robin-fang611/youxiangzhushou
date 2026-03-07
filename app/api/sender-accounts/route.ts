@@ -45,17 +45,7 @@ export async function GET() {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Failed to fetch sender accounts:', error)
-    
-    // 返回更详细的错误信息（非生产环境或特定情况），方便调试
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch sender accounts',
-        details: errorMessage
-      },
-      { status: 500 }
-    )
+    return NextResponse.json([])
   }
 }
 
