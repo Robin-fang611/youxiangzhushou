@@ -43,6 +43,14 @@ export default function TestPage() {
     setStats(result)
   }
 
+  const safeIssues = Array.isArray(qualityCheck?.issues) ? qualityCheck.issues : []
+  const safeSuggestions = Array.isArray(qualityCheck?.suggestions) ? qualityCheck.suggestions : []
+  const safeTestResults = Array.isArray(testResults) ? testResults : []
+  const safeDomainReputation =
+    stats && typeof stats.domainReputation === 'object' && stats.domainReputation !== null
+      ? stats.domainReputation
+      : {}
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -144,22 +152,22 @@ export default function TestPage() {
               </div>
             </div>
 
-            {qualityCheck.issues.length > 0 && (
+            {safeIssues.length > 0 && (
               <div className="border-t pt-4">
                 <h3 className="font-medium mb-2">发现的问题:</h3>
                 <ul className="list-disc list-inside text-red-600 space-y-1">
-                  {qualityCheck.issues.map((issue: string, i: number) => (
+                  {safeIssues.map((issue: string, i: number) => (
                     <li key={i}>{issue}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {qualityCheck.suggestions.length > 0 && (
+            {safeSuggestions.length > 0 && (
               <div className="border-t pt-4 mt-4">
                 <h3 className="font-medium mb-2">优化建议:</h3>
                 <ul className="list-disc list-inside text-green-600 space-y-1">
-                  {qualityCheck.suggestions.map((suggestion: string, i: number) => (
+                  {safeSuggestions.map((suggestion: string, i: number) => (
                     <li key={i}>{suggestion}</li>
                   ))}
                 </ul>
@@ -200,12 +208,12 @@ export default function TestPage() {
         </div>
 
         {/* 发送测试结果 */}
-        {testResults.length > 0 && (
+        {safeTestResults.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-lg font-semibold mb-4">测试邮件发送结果</h2>
             
             <div className="space-y-3">
-              {testResults.map((result, index) => (
+              {safeTestResults.map((result, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     {result.success ? (
@@ -253,16 +261,16 @@ export default function TestPage() {
               <div>
                 <div className="text-sm text-gray-600">域名信誉</div>
                 <div className="text-3xl font-bold text-green-600">
-                  {Object.keys(stats.domainReputation || {}).length} 个
+                  {Object.keys(safeDomainReputation).length} 个
                 </div>
               </div>
             </div>
 
-            {Object.keys(stats.domainReputation || {}).length > 0 && (
+            {Object.keys(safeDomainReputation).length > 0 && (
               <div className="border-t mt-4 pt-4">
                 <h3 className="font-medium mb-2">域名信誉详情:</h3>
                 <div className="grid md:grid-cols-4 gap-2">
-                  {Object.entries(stats.domainReputation).map(([domain, rep]: any) => (
+                  {Object.entries(safeDomainReputation).map(([domain, rep]: any) => (
                     <div key={domain} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                       <span className="text-sm">{domain}</span>
                       <span className={`font-bold ${

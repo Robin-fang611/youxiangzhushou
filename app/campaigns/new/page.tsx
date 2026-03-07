@@ -230,7 +230,7 @@ export default function NewCampaignPage() {
                 )}
               </div>
 
-              {customers.length > 0 && (
+              {Array.isArray(customers) && customers.length > 0 && (
                 <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <p className="text-green-800">
                     <strong>✅ 成功解析 {customers.length} 个有效联系人</strong>
@@ -343,12 +343,14 @@ export default function NewCampaignPage() {
               {/* 客户列表预览 */}
               <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                 <h3 className="font-semibold text-gray-700 mb-2">
-                  📧 将发送给 {customers.length} 位联系人
+                  📧 将发送给 {Array.isArray(customers) ? customers.length : 0} 位联系人
                 </h3>
-                <div className="flex gap-4 text-sm text-gray-600">
-                  <span>姓名：{customers.filter(c => c.name).length} 位有姓名</span>
-                  <span>公司：{customers.filter(c => c.company).length} 位有公司</span>
-                </div>
+                {Array.isArray(customers) && (
+                  <div className="flex gap-4 text-sm text-gray-600">
+                    <span>姓名：{customers.filter(c => c.name).length} 位有姓名</span>
+                    <span>公司：{customers.filter(c => c.company).length} 位有公司</span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3">

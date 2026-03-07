@@ -26,6 +26,7 @@ export default function SettingsPage() {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingAccount, setEditingAccount] = useState<SenderAccount | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     loadAccounts()
@@ -33,19 +34,26 @@ export default function SettingsPage() {
 
   async function loadAccounts() {
     try {
+      setLoadError('')
       const res = await fetch('/api/sender-accounts')
+      const payload = await res.json()
+      const accountsData = Array.isArray(payload)
+        ? payload
+        : (Array.isArray(payload?.data) ? payload.data : [])
+
       if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`)
+        const message =
+          payload?.error?.message ||
+          payload?.error ||
+          `HTTP error! status: ${res.status}`
+        throw new Error(message)
       }
-      const data = await res.json()
-      console.log('Loaded accounts:', data)
-      // 确保数据总是数组格式
-      const accountsData = Array.isArray(data) ? data : []
-      console.log('Sanitized accounts data:', accountsData)
+
       setAccounts(accountsData)
     } catch (error) {
       console.error('Failed to load accounts:', error)
       setAccounts([])
+      setLoadError(error instanceof Error ? error.message : '加载发件邮箱失败')
     } finally {
       setLoading(false)
     }
@@ -136,6 +144,11 @@ export default function SettingsPage() {
             添加邮箱
           </button>
         </div>
+        {loadError && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
 
         {/* 邮箱列表 */}
         {loading ? (

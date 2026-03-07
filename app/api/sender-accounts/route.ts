@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+const REQUIRED_ENV_KEYS = ['DATABASE_URL', 'DIRECT_DATABASE_URL'] as const
+
+function getMissingEnvVars() {
+  return REQUIRED_ENV_KEYS.filter((key) => !process.env[key] || process.env[key]?.trim() === '')
+}
+
+function jsonErrorResponse(
+  message: string,
+  status: number,
+  code: string,
+  details?: Record<string, unknown>
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      error: {
+        code,
+        message,
+        details: details || null
+      }
+    },
+    { status }
+  )
+}
+
 function normalizeSenderAccount(account: any) {
   let smtpHost = ''
   let smtpPort = 465
@@ -36,20 +61,50 @@ function normalizeSenderAccount(account: any) {
 }
 
 export async function GET() {
+  const missingEnv = getMissingEnvVars()
+  if (missingEnv.length > 0) {
+    console.error('[sender-accounts][GET] Missing required env vars', { missingEnv })
+    return jsonErrorResponse(
+      'Missing required database environment variables',
+      500,
+      'ENV_MISSING',
+      { missingEnv }
+    )
+  }
+
   try {
     const accounts = await prisma.senderAccount.findMany({
       orderBy: { createdAt: 'desc' }
     })
 
     const result = Array.isArray(accounts) ? accounts.map(normalizeSenderAccount) : []
-    return NextResponse.json(result)
+    return NextResponse.json({ success: true, data: result })
   } catch (error) {
-    console.error('Failed to fetch sender accounts:', error)
-    return NextResponse.json([])
+    console.error('[sender-accounts][GET] Failed to fetch sender accounts', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : null
+    })
+    return jsonErrorResponse(
+      'Failed to fetch sender accounts',
+      500,
+      'DB_QUERY_FAILED',
+      { message: error instanceof Error ? error.message : 'Unknown error' }
+    )
   }
 }
 
 export async function POST(request: NextRequest) {
+  const missingEnv = getMissingEnvVars()
+  if (missingEnv.length > 0) {
+    console.error('[sender-accounts][POST] Missing required env vars', { missingEnv })
+    return jsonErrorResponse(
+      'Missing required database environment variables',
+      500,
+      'ENV_MISSING',
+      { missingEnv }
+    )
+  }
+
   try {
     const body = await request.json()
     const {
@@ -66,9 +121,10 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name || !email || !smtpHost || !smtpPort || !smtpUser || !smtpPass) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+      return jsonErrorResponse(
+        'Missing required fields',
+        400,
+        'VALIDATION_ERROR'
       )
     }
 
@@ -94,17 +150,33 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(account)
+    return NextResponse.json({ success: true, data: normalizeSenderAccount(account) })
   } catch (error) {
-    console.error('Failed to create sender account:', error)
-    return NextResponse.json(
-      { error: 'Failed to create sender account' },
-      { status: 500 }
+    console.error('[sender-accounts][POST] Failed to create sender account', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : null
+    })
+    return jsonErrorResponse(
+      'Failed to create sender account',
+      500,
+      'DB_WRITE_FAILED',
+      { message: error instanceof Error ? error.message : 'Unknown error' }
     )
   }
 }
 
 export async function PUT(request: NextRequest) {
+  const missingEnv = getMissingEnvVars()
+  if (missingEnv.length > 0) {
+    console.error('[sender-accounts][PUT] Missing required env vars', { missingEnv })
+    return jsonErrorResponse(
+      'Missing required database environment variables',
+      500,
+      'ENV_MISSING',
+      { missingEnv }
+    )
+  }
+
   try {
     const body = await request.json()
     const {
@@ -121,9 +193,10 @@ export async function PUT(request: NextRequest) {
     } = body
 
     if (!id) {
-      return NextResponse.json(
-        { error: 'Missing account ID' },
-        { status: 400 }
+      return jsonErrorResponse(
+        'Missing account ID',
+        400,
+        'VALIDATION_ERROR'
       )
     }
 
@@ -148,12 +221,17 @@ export async function PUT(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(account)
+    return NextResponse.json({ success: true, data: normalizeSenderAccount(account) })
   } catch (error) {
-    console.error('Failed to update sender account:', error)
-    return NextResponse.json(
-      { error: 'Failed to update sender account' },
-      { status: 500 }
+    console.error('[sender-accounts][PUT] Failed to update sender account', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : null
+    })
+    return jsonErrorResponse(
+      'Failed to update sender account',
+      500,
+      'DB_WRITE_FAILED',
+      { message: error instanceof Error ? error.message : 'Unknown error' }
     )
   }
 }

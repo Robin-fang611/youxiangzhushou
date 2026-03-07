@@ -39,7 +39,8 @@ export default function CampaignsPage() {
   const loadCampaigns = async () => {
     setLoading(true)
     const data = await getAllCampaigns()
-    setCampaigns(data)
+    const safeCampaigns = Array.isArray(data) ? data : []
+    setCampaigns(safeCampaigns)
     setLoading(false)
   }
 
@@ -113,7 +114,7 @@ export default function CampaignsPage() {
         </div>
 
         {/* 统计卡片 */}
-        {!loading && campaigns.length > 0 && (
+        {!loading && Array.isArray(campaigns) && campaigns.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex items-center gap-3 mb-2">
@@ -174,7 +175,7 @@ export default function CampaignsPage() {
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600 mb-4" />
             <p className="text-gray-600">加载中...</p>
           </div>
-        ) : campaigns.length === 0 ? (
+        ) : !Array.isArray(campaigns) || campaigns.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <p className="text-gray-600 mb-4">暂无营销活动</p>
             <Link
@@ -186,7 +187,7 @@ export default function CampaignsPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {campaigns.map(campaign => {
+            {Array.isArray(campaigns) && campaigns.map(campaign => {
               const StatusIcon = statusConfig[campaign.status as keyof typeof statusConfig]?.icon || Clock
               const statusInfo = statusConfig[campaign.status as keyof typeof statusConfig] || statusConfig.DRAFT
 

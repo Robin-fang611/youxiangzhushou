@@ -58,7 +58,7 @@ export async function sendCampaignInBatches(campaignId: string) {
         sendEmailWithRetry(campaignId, contact)
       )
 
-      const batchResults = await Promise.all(batchPromises)
+      const batchResults = Array.isArray(batchPromises) ? await Promise.all(batchPromises) : []
 
       // 统计批次结果
       batchResults.forEach(result => {

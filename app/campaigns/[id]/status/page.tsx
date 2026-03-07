@@ -25,25 +25,45 @@ export default function CampaignStatusPage() {
   const router = useRouter()
   const [status, setStatus] = useState<CampaignStatus | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    const pollStatus = async () => {
-      const data = await getCampaignStatus(params.id as string)
-      if (data) {
-        setStatus(data)
-        setLoading(false)
+    let timer: ReturnType<typeof setTimeout> | null = null
+    let isMounted = true
 
-        // 如果已完成，停止轮询
-        if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+    const pollStatus = async () => {
+      try {
+        const data = await getCampaignStatus(params.id as string)
+        if (!isMounted) {
           return
         }
+        if (data) {
+          setStatus(data)
+          setError('')
+          setLoading(false)
+          if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+            return
+          }
+        }
+      } catch (err) {
+        if (!isMounted) {
+          return
+        }
+        setError(err instanceof Error ? err.message : '加载状态失败')
+        setLoading(false)
       }
 
-      // 继续轮询
-      setTimeout(pollStatus, 2000)
+      timer = setTimeout(pollStatus, 2000)
     }
 
     pollStatus()
+
+    return () => {
+      isMounted = false
+      if (timer) {
+        clearTimeout(timer)
+      }
+    }
   }, [params.id])
 
   if (loading) {
@@ -72,6 +92,8 @@ export default function CampaignStatusPage() {
       </div>
     )
   }
+
+  const logs = Array.isArray(status.logs) ? status.logs : []
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -157,13 +179,17 @@ export default function CampaignStatusPage() {
             </h2>
           </div>
           <div className="max-h-96 overflow-y-auto">
-            {status.logs.length === 0 ? (
+            {error ? (
+              <div className="p-8 text-center text-red-600">
+                {error}
+              </div>
+            ) : logs.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
                 暂无日志记录
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {status.logs.map(log => (
+                {logs.map(log => (
                   <div key={log.id} className="p-4 hover:bg-gray-50">
                     <div className="flex items-start gap-3">
                       {log.level === 'INFO' ? (
