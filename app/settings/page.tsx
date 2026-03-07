@@ -321,14 +321,26 @@ function EmailForm({ account, onSave, onCancel }: {
         })
       })
 
-      if (res.ok) {
+      const data = await res.json()
+
+      if (res.ok && data.success) {
         onSave()
       } else {
-        const data = await res.json()
-        alert('保存失败：' + data.error)
+        // 显示错误信息
+        const errorInfo = data.error
+        let errorMsg = '保存失败'
+        
+        if (typeof errorInfo === 'string') {
+          errorMsg = errorInfo
+        } else if (errorInfo?.message) {
+          errorMsg = errorInfo.message
+        }
+        
+        alert(errorMsg)
       }
     } catch (error) {
-      alert('保存失败')
+      console.error('保存发件箱失败:', error)
+      alert('保存失败：网络错误或服务器异常')
     } finally {
       setSaving(false)
     }

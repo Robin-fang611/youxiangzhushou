@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 
     const account = await prisma.senderAccount.create({
       data: {
-        userId: 'system', // TODO: Replace with actual user ID from session
+        userId: 'system',
         name,
         email,
         smtpConfig,
@@ -151,16 +151,46 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, data: normalizeSenderAccount(account) })
-  } catch (error) {
+  } catch (error: any) {
     console.error('[sender-accounts][POST] Failed to create sender account', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : null
+      code: error?.code,
+      message: error?.message
     })
+
+    // 处理唯一约束冲突
+    if (error?.code === 'P2002') {
+      return jsonErrorResponse(
+        '该邮箱地址已存在，请勿重复添加',
+        409,
+        'DUPLICATE_EMAIL'
+      )
+    }
+
+    // 处理数据库连接问题
+    if (error?.message?.includes('DATABASE_URL')) {
+      return jsonErrorResponse(
+        '数据库连接失败，请检查 DATABASE_URL 配置',
+        500,
+        'DB_CONNECTION_FAILED',
+        { message: error.message }
+      )
+    }
+
+    // 处理表不存在的问题
+    if (error?.message?.includes("does not exist") || error?.message?.includes("doesn't exist")) {
+      return jsonErrorResponse(
+        '数据库表未初始化，请等待部署完成或手动执行 prisma db push',
+        500,
+        'TABLE_NOT_FOUND',
+        { message: error.message }
+      )
+    }
+
     return jsonErrorResponse(
-      'Failed to create sender account',
+      `保存失败：${error?.message || '未知错误'}`,
       500,
       'DB_WRITE_FAILED',
-      { message: error instanceof Error ? error.message : 'Unknown error' }
+      { message: error?.message }
     )
   }
 }

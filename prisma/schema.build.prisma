@@ -173,8 +173,8 @@ model EmailTemplate {
 
 model SenderAccount {
   id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?  // 可选，兼容无用户系统
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   name        String
   email       String
   smtpConfig  String
@@ -190,8 +190,8 @@ model SenderAccount {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
-  @@unique([userId, email])
   @@index([userId])
+  @@index([email])
 }
 
 // ==================== 邮件发送任务 ====================
