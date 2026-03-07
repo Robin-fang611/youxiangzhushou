@@ -555,6 +555,7 @@ export async function startCampaign(campaignId: string): Promise<CampaignResult>
       return { success: false, error: '该营销活动无法启动' }
     }
 
+    // 立即执行，不使用 setTimeout
     await prisma.campaign.update({
       where: { id: campaignId },
       data: {
@@ -563,11 +564,19 @@ export async function startCampaign(campaignId: string): Promise<CampaignResult>
       }
     })
 
+    // 创建启动日志
+    await prisma.campaignLog.create({
+      data: {
+        campaignId,
+        level: 'INFO',
+        message: `营销活动启动，共 ${campaign.contacts.length} 个联系人`
+      }
+    })
+
     revalidatePath('/campaigns')
 
-    setTimeout(() => {
-      executeCampaign(campaignId)
-    }, 1000)
+    // 立即执行邮件发送（不等待）
+    executeCampaign(campaignId)
 
     return {
       success: true,
