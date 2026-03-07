@@ -141,7 +141,6 @@ export async function POST(request: NextRequest) {
 
     const account = await prisma.senderAccount.create({
       data: {
-        userId: 'system',
         name,
         email,
         smtpConfig,
