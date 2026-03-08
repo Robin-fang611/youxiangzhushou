@@ -337,140 +337,183 @@ export class EmailService {
       replyTo?: string
       skipSpamCheck?: boolean
       headers?: Record<string, string>
+      retryCount?: number
     }
   ): Promise<EmailResult> {
-    try {
-      // 1. 速率限制检查
-      const rateCheck = this.checkRateLimit(to)
-      if (!rateCheck.allowed) {
-        return {
-          success: false,
-          error: `发送频率过高，请等待 ${rateCheck.waitTime} 秒后重试`,
-          spamScore: 100,
-          suggestions: ['降低发送频率，避免被识别为垃圾邮件']
+    const maxRetries = options?.retryCount !== undefined ? options.retryCount : 2
+    let lastError: Error | null = null
+    
+    // 重试逻辑
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[EmailService] 重试发送 (${attempt + 1}/${maxRetries + 1}) 到 ${to}`)
+          // 重试前等待：指数退避 (1s, 2s, 4s...)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
         }
-      }
-
-      // 2. 域名信誉检查
-      const domainReputation = this.checkDomainReputation(to)
-      if (domainReputation < 30) {
-        return {
-          success: false,
-          error: '收件人域名信誉较低',
-          spamScore: 80,
-          suggestions: ['该邮箱可能是无效域名，建议清理']
-        }
-      }
-
-      // 3. 垃圾邮件检查（除非明确跳过）
-      if (!options?.skipSpamCheck) {
-        const spamCheck = this.checkSpamScore(subject, body)
         
-        if (spamCheck.score >= 10) {
+        // 1. 速率限制检查
+        const rateCheck = this.checkRateLimit(to)
+        if (!rateCheck.allowed) {
           return {
             success: false,
-            error: '邮件内容可能被识别为垃圾邮件',
-            spamScore: spamCheck.score,
-            suggestions: spamCheck.suggestions
+            error: `发送频率过高，请等待 ${rateCheck.waitTime} 秒后重试`,
+            spamScore: 100,
+            suggestions: ['降低发送频率，避免被识别为垃圾邮件']
           }
         }
 
-        if (spamCheck.score >= 5) {
-          console.warn('[EmailService] 邮件内容警告:', {
-            to,
-            score: spamCheck.score,
-            issues: spamCheck.issues
-          })
+        // 2. 域名信誉检查
+        const domainReputation = this.checkDomainReputation(to)
+        if (domainReputation < 30) {
+          return {
+            success: false,
+            error: '收件人域名信誉较低',
+            spamScore: 80,
+            suggestions: ['该邮箱可能是无效域名，建议清理']
+          }
+        }
+
+        // 3. 垃圾邮件检查（除非明确跳过）
+        if (!options?.skipSpamCheck) {
+          const spamCheck = this.checkSpamScore(subject, body)
+          
+          if (spamCheck.score >= 10) {
+            return {
+              success: false,
+              error: '邮件内容可能被识别为垃圾邮件',
+              spamScore: spamCheck.score,
+              suggestions: spamCheck.suggestions
+            }
+          }
+
+          if (spamCheck.score >= 5) {
+            console.warn('[EmailService] 邮件内容警告:', {
+              to,
+              score: spamCheck.score,
+              issues: spamCheck.issues
+            })
+          }
+        }
+
+        // 4. 优化邮件内容
+        const { subject: optimizedSubject, body: optimizedBody, headers } = 
+          this.optimizeContent(subject, body, to)
+
+        // 5. 构造邮件选项
+        const fromName = options?.fromName || this.config.fromName || 'Business Bot'
+        const replyTo = options?.replyTo || this.config.replyTo || this.config.auth.user
+
+        const mailOptions: nodemailer.SendMailOptions = {
+          from: {
+            name: fromName,
+            address: this.config.auth.user
+          },
+          to,
+          subject: optimizedSubject,
+          text: optimizedBody, // 纯文本版本（反垃圾邮件推荐）
+          html: optimizedBody.replace(/\n/g, '<br>'), // HTML 版本
+          replyTo,
+          headers: {
+            ...headers,
+            ...options?.headers
+          },
+          // 添加 Message-ID（符合 RFC 5322）
+          messageId: this.generateMessageId(this.config.auth.user.split('@')[1] || 'qq.com'),
+          // 添加退订头（RFC 8058）
+          list: {
+            unsubscribe: `<mailto:${this.config.auth.user}?subject=unsubscribe>`
+          }
+        }
+
+        // 6. 发送邮件
+        console.log(`[EmailService] 正在发送邮件到 ${to} (尝试 ${attempt + 1}/${maxRetries + 1})`)
+        const info = await this.transporter.sendMail(mailOptions)
+        
+        // 7. 更新发送记录
+        this.sendCount.set(to, (this.sendCount.get(to) || 0) + 1)
+        this.lastSendTime.set(to, Date.now())
+
+        // 8. 更新域名信誉
+        const domain = to.split('@')[1]?.toLowerCase()
+        if (domain) {
+          const currentRep = this.domainReputation.get(domain) || 50
+          this.domainReputation.set(domain, Math.min(100, currentRep + 1))
+        }
+
+        console.log('[EmailService] 发送成功:', {
+          to,
+          messageId: info.messageId,
+          response: info.response
+        })
+
+        return {
+          success: true,
+          messageId: info.messageId,
+          spamScore: 0,
+          suggestions: []
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        lastError = error instanceof Error ? error : new Error(errorMessage)
+        
+        console.error(`[EmailService] 发送失败 (尝试 ${attempt + 1}/${maxRetries + 1}):`, {
+          to,
+          subject: subject.substring(0, 50) + '...',
+          error: errorMessage
+        })
+        
+        // 检查是否为认证错误（不重试）
+        if (errorMessage.includes('535') || errorMessage.includes('authentication') || errorMessage.includes('Invalid login')) {
+          console.error('[EmailService] 认证错误，停止重试:', errorMessage)
+          break // 认证错误不重试
+        }
+        
+        // 检查是否为网络错误（可重试）
+        if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('socket')) {
+          console.log('[EmailService] 网络错误，准备重试...')
+          continue // 网络错误继续重试
+        }
+        
+        // 其他错误，根据情况重试
+        if (attempt < maxRetries) {
+          console.log(`[EmailService] 将在 ${Math.pow(2, attempt + 1)} 秒后重试...`)
         }
       }
+    }
+    
+    // 所有重试都失败
+    const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown error'
+    
+    // 分析错误类型
+    let spamRelated = false
+    if (errorMessage.includes('550') || errorMessage.includes('spam')) {
+      spamRelated = true
+    }
+    
+    // 降低域名信誉
+    const domain = to.split('@')[1]?.toLowerCase()
+    if (domain) {
+      const currentRep = this.domainReputation.get(domain) || 50
+      this.domainReputation.set(domain, Math.max(0, currentRep - 10))
+    }
 
-      // 4. 优化邮件内容
-      const { subject: optimizedSubject, body: optimizedBody, headers } = 
-        this.optimizeContent(subject, body, to)
+    console.error('[EmailService] 最终发送失败:', {
+      to,
+      error: errorMessage,
+      attempts: maxRetries + 1,
+      spamRelated
+    })
 
-      // 5. 构造邮件选项
-      const fromName = options?.fromName || this.config.fromName || 'Business Bot'
-      const replyTo = options?.replyTo || this.config.replyTo || this.config.auth.user
-
-      const mailOptions: nodemailer.SendMailOptions = {
-        from: {
-          name: fromName,
-          address: this.config.auth.user
-        },
-        to,
-        subject: optimizedSubject,
-        text: optimizedBody, // 纯文本版本（反垃圾邮件推荐）
-        html: optimizedBody.replace(/\n/g, '<br>'), // HTML 版本
-        replyTo,
-        headers: {
-          ...headers,
-          ...options?.headers
-        },
-        // 添加 Message-ID（符合 RFC 5322）
-        messageId: this.generateMessageId(this.config.auth.user.split('@')[1] || 'qq.com'),
-        // 添加退订头（RFC 8058）
-        list: {
-          unsubscribe: `<mailto:${this.config.auth.user}?subject=unsubscribe>`
-        }
-      }
-
-      // 6. 发送邮件
-      const info = await this.transporter.sendMail(mailOptions)
-      
-      // 7. 更新发送记录
-      this.sendCount.set(to, (this.sendCount.get(to) || 0) + 1)
-      this.lastSendTime.set(to, Date.now())
-
-      // 8. 更新域名信誉
-      const domain = to.split('@')[1]?.toLowerCase()
-      if (domain) {
-        const currentRep = this.domainReputation.get(domain) || 50
-        this.domainReputation.set(domain, Math.min(100, currentRep + 1))
-      }
-
-      console.log('[EmailService] 发送成功:', {
-        to,
-        messageId: info.messageId,
-        response: info.response
-      })
-
-      return {
-        success: true,
-        messageId: info.messageId,
-        spamScore: 0,
-        suggestions: []
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
-      // 分析错误类型
-      let spamRelated = false
-      if (errorMessage.includes('550') || errorMessage.includes('spam')) {
-        spamRelated = true
-      }
-
-      console.error('[EmailService] 发送失败:', {
-        to,
-        subject,
-        error: errorMessage,
-        spamRelated
-      })
-
-      // 降低域名信誉
-      const domain = to.split('@')[1]?.toLowerCase()
-      if (domain) {
-        const currentRep = this.domainReputation.get(domain) || 50
-        this.domainReputation.set(domain, Math.max(0, currentRep - 10))
-      }
-
-      return {
-        success: false,
-        error: errorMessage,
-        spamScore: spamRelated ? 100 : 0,
-        suggestions: spamRelated 
-          ? ['邮件可能被识别为垃圾邮件，请检查内容和发送频率']
+    return {
+      success: false,
+      error: errorMessage,
+      spamScore: spamRelated ? 100 : 0,
+      suggestions: spamRelated 
+        ? ['邮件可能被识别为垃圾邮件，请检查内容和发送频率']
+        : errorMessage.includes('535')
+          ? ['SMTP 认证失败，请检查邮箱账号和授权码是否正确', '查看 SMTP_SETUP_GUIDE.md 获取配置指南']
           : []
-      }
     }
   }
 
