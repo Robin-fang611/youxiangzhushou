@@ -697,17 +697,25 @@ async function executeCampaign(campaignId: string) {
         if ((successCount + failedCount) % 10 === 0 || processedCount === campaign.contacts.length) {
           const currentSuccess = successCount
           const currentFailed = failedCount
+          const totalProcessed = currentSuccess + currentFailed
+          
+          // 计算当前总处理数（已处理 + 本次批量）
+          const currentTotalSuccess = campaign.successCount + currentSuccess
+          const currentTotalFailed = campaign.failedCount + currentFailed
+          const currentProgress = campaign.totalRecipients > 0 
+            ? Math.round(((currentTotalSuccess + currentTotalFailed) / campaign.totalRecipients) * 100)
+            : 0
           
           await prisma.campaign.update({
             where: { id: campaignId },
             data: {
               successCount: { increment: currentSuccess },
               failedCount: { increment: currentFailed },
-              progress: Math.round(((processedCount) / campaign.contacts.length) * 100)
+              progress: currentProgress
             }
           })
           
-          console.log(`[executeCampaign] ${executionId} - 批量更新进度：成功=${currentSuccess}, 失败=${currentFailed}, 总进度=${Math.round((processedCount / campaign.contacts.length) * 100)}%`)
+          console.log(`[executeCampaign] ${executionId} - 批量更新进度：成功=${currentSuccess}, 失败=${currentFailed}, 总进度=${currentProgress}%`)
           
           successCount = 0
           failedCount = 0
@@ -742,6 +750,11 @@ async function executeCampaign(campaignId: string) {
     // 4. 更新最终状态
     const finalSuccess = successCount
     const finalFailed = failedCount
+    const finalTotalSuccess = campaign.successCount + finalSuccess
+    const finalTotalFailed = campaign.failedCount + finalFailed
+    const finalProgress = campaign.totalRecipients > 0 
+      ? Math.round(((finalTotalSuccess + finalTotalFailed) / campaign.totalRecipients) * 100)
+      : 100
     
     await prisma.campaign.update({
       where: { id: campaignId },
@@ -750,7 +763,7 @@ async function executeCampaign(campaignId: string) {
         completedAt: new Date(),
         successCount: { increment: finalSuccess },
         failedCount: { increment: finalFailed },
-        progress: 100
+        progress: finalProgress
       }
     })
 
@@ -764,12 +777,13 @@ async function executeCampaign(campaignId: string) {
           endTime: new Date().toISOString(),
           total: campaign.contacts.length,
           success: finalSuccess,
-          failed: finalFailed
+          failed: finalFailed,
+          progress: finalProgress
         })
       }
     })
 
-    console.log(`[executeCampaign] ${executionId} - 执行完成：成功=${finalSuccess}, 失败=${finalFailed}`)
+    console.log(`[executeCampaign] ${executionId} - 执行完成：成功=${finalSuccess}, 失败=${finalFailed}, 进度=${finalProgress}%`)
 
     revalidatePath('/campaigns')
   } catch (error: any) {
@@ -816,9 +830,12 @@ export async function getCampaignStatus(campaignId: string): Promise<CampaignSta
       return null
     }
 
-    const progress = campaign.totalRecipients > 0
-      ? Math.round(((campaign.successCount + campaign.failedCount) / campaign.totalRecipients) * 100)
-      : 0
+    // 使用数据库中的 progress 字段，如果为 0 则重新计算
+    const progress = campaign.progress > 0
+      ? campaign.progress
+      : (campaign.totalRecipients > 0
+        ? Math.round(((campaign.successCount + campaign.failedCount) / campaign.totalRecipients) * 100)
+        : 0)
 
     return {
       id: campaign.id,
@@ -858,9 +875,12 @@ export async function getAllCampaigns() {
       totalRecipients: campaign.totalRecipients,
       successCount: campaign.successCount,
       failedCount: campaign.failedCount,
-      progress: campaign.totalRecipients > 0
-        ? Math.round(((campaign.successCount + campaign.failedCount) / campaign.totalRecipients) * 100)
-        : 0,
+      // 使用数据库中的 progress 字段，如果为 0 则重新计算
+      progress: campaign.progress > 0
+        ? campaign.progress
+        : (campaign.totalRecipients > 0
+          ? Math.round(((campaign.successCount + campaign.failedCount) / campaign.totalRecipients) * 100)
+          : 0),
       createdAt: campaign.createdAt.toISOString(),
       completedAt: campaign.completedAt?.toISOString()
     }))
