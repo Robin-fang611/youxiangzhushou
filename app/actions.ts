@@ -592,31 +592,59 @@ export async function startCampaign(campaignId: string): Promise<CampaignResult>
 }
 
 async function executeCampaign(campaignId: string) {
+  const executionId = `${campaignId}-${Date.now()}`
+  console.log(`[executeCampaign] ${executionId} - 开始执行`)
+  
   try {
+    // 1. 获取活动信息
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: { contacts: true }
     })
 
-    if (!campaign || campaign.status !== 'SENDING') {
+    if (!campaign) {
+      console.error(`[executeCampaign] ${executionId} - 活动不存在`)
       return
     }
 
+    if (campaign.status !== 'SENDING') {
+      console.warn(`[executeCampaign] ${executionId} - 活动状态不是 SENDING: ${campaign.status}`)
+      return
+    }
+
+    console.log(`[executeCampaign] ${executionId} - 活动信息：`, {
+      id: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      totalRecipients: campaign.totalRecipients,
+      contactsCount: campaign.contacts.length
+    })
+
+    // 2. 记录启动日志（立即刷新）
     await prisma.campaignLog.create({
       data: {
         campaignId,
         level: 'INFO',
-        message: `开始执行营销活动，共 ${campaign.contacts.length} 个联系人`
+        message: `开始执行营销活动，共 ${campaign.contacts.length} 个联系人`,
+        details: JSON.stringify({ executionId, startTime: new Date().toISOString() })
       }
     })
+    console.log(`[executeCampaign] ${executionId} - 启动日志已记录`)
 
     let successCount = 0
     let failedCount = 0
+    let processedCount = 0
 
+    // 3. 遍历联系人发送邮件
     for (const contact of campaign.contacts) {
+      processedCount++
+      
       if (contact.status !== 'PENDING') {
+        console.log(`[executeCampaign] ${executionId} - 跳过已处理联系人：${contact.email} (${contact.status})`)
         continue
       }
+
+      console.log(`[executeCampaign] ${executionId} - 处理 ${processedCount}/${campaign.contacts.length}: ${contact.email}`)
 
       try {
         const variables = {
@@ -627,12 +655,17 @@ async function executeCampaign(campaignId: string) {
         const personalizedSubject = parseVariables(campaign.subject, variables)
         const personalizedBody = parseVariables(campaign.body, variables)
 
+        console.log(`[executeCampaign] ${executionId} - 发送邮件到 ${contact.email}`)
+
         const result = await emailService.sendEmail(
           contact.email,
           personalizedSubject,
           personalizedBody
         )
 
+        console.log(`[executeCampaign] ${executionId} - 发送结果：`, result)
+
+        // 更新联系人状态
         await prisma.campaignContact.update({
           where: { id: contact.id },
           data: {
@@ -642,6 +675,7 @@ async function executeCampaign(campaignId: string) {
           }
         })
 
+        // 记录日志
         await prisma.campaignLog.create({
           data: {
             campaignId,
@@ -659,23 +693,30 @@ async function executeCampaign(campaignId: string) {
           failedCount++
         }
 
-        // 每发送 10 封邮件更新一次进度
-        if ((successCount + failedCount) % 10 === 0) {
+        // 每发送 10 封邮件或最后一个联系人时更新进度
+        if ((successCount + failedCount) % 10 === 0 || processedCount === campaign.contacts.length) {
+          const currentSuccess = successCount
+          const currentFailed = failedCount
+          
           await prisma.campaign.update({
             where: { id: campaignId },
             data: {
-              successCount: { increment: successCount },
-              failedCount: { increment: failedCount }
+              successCount: { increment: currentSuccess },
+              failedCount: { increment: currentFailed },
+              progress: Math.round(((processedCount) / campaign.contacts.length) * 100)
             }
           })
+          
+          console.log(`[executeCampaign] ${executionId} - 批量更新进度：成功=${currentSuccess}, 失败=${currentFailed}, 总进度=${Math.round((processedCount / campaign.contacts.length) * 100)}%`)
+          
           successCount = 0
           failedCount = 0
         }
 
-        // 缩短延迟时间到 500ms
+        // 延迟 500ms（避免触发反垃圾机制）
         await new Promise(resolve => setTimeout(resolve, 500))
       } catch (contactError: any) {
-        console.error('[executeCampaign] Contact error:', contactError)
+        console.error(`[executeCampaign] ${executionId} - 联系人错误:`, contactError)
         
         await prisma.campaignContact.update({
           where: { id: contact.id },
@@ -690,7 +731,7 @@ async function executeCampaign(campaignId: string) {
             campaignId,
             level: 'ERROR',
             message: `处理联系人 ${contact.email} 时出错`,
-            details: JSON.stringify({ error: contactError.message })
+            details: JSON.stringify({ error: contactError.message, stack: contactError.stack })
           }
         })
 
@@ -698,14 +739,18 @@ async function executeCampaign(campaignId: string) {
       }
     }
 
-    // 更新最终计数
+    // 4. 更新最终状态
+    const finalSuccess = successCount
+    const finalFailed = failedCount
+    
     await prisma.campaign.update({
       where: { id: campaignId },
       data: {
         status: 'COMPLETED',
         completedAt: new Date(),
-        successCount: { increment: successCount },
-        failedCount: { increment: failedCount }
+        successCount: { increment: finalSuccess },
+        failedCount: { increment: finalFailed },
+        progress: 100
       }
     })
 
@@ -713,17 +758,29 @@ async function executeCampaign(campaignId: string) {
       data: {
         campaignId,
         level: 'INFO',
-        message: `营销活动完成，成功：${successCount}, 失败：${failedCount}`
+        message: `营销活动执行完成 - 总收件人：${campaign.contacts.length}, 成功：${finalSuccess}, 失败：${finalFailed}`,
+        details: JSON.stringify({ 
+          executionId,
+          endTime: new Date().toISOString(),
+          total: campaign.contacts.length,
+          success: finalSuccess,
+          failed: finalFailed
+        })
       }
     })
 
+    console.log(`[executeCampaign] ${executionId} - 执行完成：成功=${finalSuccess}, 失败=${finalFailed}`)
+
     revalidatePath('/campaigns')
   } catch (error: any) {
-    console.error('[executeCampaign] Error:', error)
+    console.error(`[executeCampaign] ${executionId} - 执行失败:`, error)
     
     await prisma.campaign.update({
       where: { id: campaignId },
-      data: { status: 'FAILED' }
+      data: { 
+        status: 'FAILED',
+        progress: 0 // 重置进度，表示异常
+      }
     })
 
     await prisma.campaignLog.create({
@@ -731,7 +788,12 @@ async function executeCampaign(campaignId: string) {
         campaignId,
         level: 'ERROR',
         message: `营销活动执行失败：${error.message}`,
-        details: JSON.stringify({ stack: error.stack })
+        details: JSON.stringify({ 
+          executionId,
+          error: error.message,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        })
       }
     })
   }
