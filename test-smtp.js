@@ -10,7 +10,7 @@ async function testSMTPConnection() {
     secure: true,
     auth: {
       user: '544639213@qq.com',
-      pass: 'lpbgqstvjfmebeba'
+      pass: 'vrugyitwiqctbbec'  // 新授权码
     },
     logger: true,
     debug: true
