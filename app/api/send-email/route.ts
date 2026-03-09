@@ -267,68 +267,13 @@ async function sendWithResend(
   req: SendEmailRequest,
   config: EmailEnvConfig
 ): Promise<SendEmailResponse> {
-  console.log('[EmailAPI] 开始使用 Resend 发送邮件')
-  console.log('[EmailAPI] 收件人:', req.to)
-  console.log('[EmailAPI] 主题:', req.subject)
-
-  try {
-    // 动态导入 Resend SDK
-    console.log('[EmailAPI] 初始化 Resend SDK...')
-    const { Resend } = await import('resend')
-    const resend = new Resend(config.resendApiKey!)
-
-    // 发送邮件
-    console.log('[EmailAPI] 调用 Resend API 发送邮件...')
-    const { data, error } = await resend.emails.send({
-      from: req.fromName 
-        ? `${req.fromName} <${config.resendFrom!}>`
-        : config.resendFrom!,
-      to: [req.to],
-      subject: req.subject,
-      text: req.body,
-      html: req.html || req.body.replace(/\n/g, '<br>'),
-      replyTo: req.replyTo,
-      headers: {
-        'X-Entity-Ref-ID': req.campaignId || 'unknown'
-      }
-    })
-
-    if (error) {
-      console.error('[EmailAPI] ❌ Resend API 返回错误:', error)
-      return {
-        success: false,
-        error: `Resend API 错误：${error.message}`,
-        provider: 'resend',
-        timestamp: new Date().toISOString(),
-        details: error
-      }
-    }
-
-    console.log('[EmailAPI] ✅ Resend 发送成功!')
-    console.log('[EmailAPI] Email ID:', data?.id)
-
-    return {
-      success: true,
-      messageId: data?.id,
-      provider: 'resend',
-      timestamp: new Date().toISOString(),
-      details: data
-    }
-  } catch (error: any) {
-    console.error('[EmailAPI] ❌ Resend 发送失败:', {
-      message: error.message,
-      stack: error.stack
-    })
-
-    return {
-      success: false,
-      error: `Resend 发送失败：${error.message}`,
-      provider: 'resend',
-      timestamp: new Date().toISOString(),
-      details: {
-        stack: error.stack
-      }
-    }
+  console.log('[EmailAPI] Resend 邮件服务未启用，请使用 Nodemailer')
+  
+  return {
+    success: false,
+    error: 'Resend 邮件服务需要安装 resend 包，当前版本仅支持 Nodemailer',
+    provider: 'resend',
+    timestamp: new Date().toISOString()
   }
 }
 
