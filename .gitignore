@@ -65,3 +65,6 @@ build/
 
 # Legacy backup
 /legacy_backup/
+
+# Sensitive Data
+SMTP_AUTH_SECRET.md
