@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { getCampaignStatus } from '../../../actions'
 import { CheckCircle, XCircle, Loader2, Mail, ArrowLeft } from 'lucide-react'
@@ -26,6 +26,7 @@ export default function CampaignStatusPage() {
   const [status, setStatus] = useState<CampaignStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const isSendingRef = useRef(false)
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -41,6 +42,26 @@ export default function CampaignStatusPage() {
           setStatus(data)
           setError('')
           setLoading(false)
+
+          // 触发批量发送
+          if (data.status === 'SENDING' && !isSendingRef.current) {
+            isSendingRef.current = true
+            console.log('Triggering batch send...')
+            fetch(`/api/campaigns/${params.id}/send-batch`, { method: 'POST' })
+              .then(res => res.json())
+              .then(result => {
+                console.log('Batch send result:', result)
+              })
+              .catch(err => {
+                console.error('Batch send error:', err)
+              })
+              .finally(() => {
+                if (isMounted) {
+                  isSendingRef.current = false
+                }
+              })
+          }
+
           if (data.status === 'COMPLETED' || data.status === 'FAILED') {
             return
           }

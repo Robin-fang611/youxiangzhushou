@@ -575,8 +575,9 @@ export async function startCampaign(campaignId: string): Promise<CampaignResult>
 
     revalidatePath('/campaigns')
 
-    // 立即执行邮件发送（不等待）
-    executeCampaign(campaignId)
+    // 注意：在 Vercel Serverless 环境下，不再在此处调用后台执行函数
+    // 而是改为由前端轮询触发 API 来分批发送
+    // executeCampaign(campaignId)
 
     return {
       success: true,

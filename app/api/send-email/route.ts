@@ -317,7 +317,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendEmail
     // 2. 校验必填字段
     console.log('[EmailAPI] 步骤 2: 校验必填字段...')
     const requiredFields = ['to', 'subject', 'body']
-    const missingFields = requiredFields.filter(field => !body[field])
+    const missingFields = requiredFields.filter(field => !body[field as keyof SendEmailRequest])
 
     if (missingFields.length > 0) {
       console.error('[EmailAPI] ❌ 缺少必填字段:', missingFields)
@@ -424,7 +424,7 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    runtime: process.runtime,
+    nodeVersion: process.version,
     emailProvider: process.env.EMAIL_PROVIDER || 'nodemailer',
     envConfigured: envValidation.valid,
     errors: envValidation.errors
