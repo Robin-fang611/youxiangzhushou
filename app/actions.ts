@@ -495,69 +495,11 @@ export async function createCampaign(
       }
     })
 
-    // 如果找到默认账户，检查是否需要更新配置（强制同步环境变量）
-    if (tempSenderAccount) {
-      try {
-        const envEmail = process.env.QQ_EMAIL || 'default@example.com'
-        const envPass = process.env.QQ_SMTP_AUTH || ''
-        
-        // 只有当环境变量存在且与当前配置不一致时才更新
-        if (envPass && envPass.length > 0) {
-           const currentConfig = JSON.parse(tempSenderAccount.smtpConfig)
-           if (currentConfig.auth?.pass !== envPass || tempSenderAccount.email !== envEmail) {
-             console.log('[createCampaign] 检测到环境变量更新，正在同步默认发件账户配置...')
-             tempSenderAccount = await prisma.senderAccount.update({
-               where: { id: tempSenderAccount.id },
-               data: {
-                 email: envEmail,
-                 smtpConfig: JSON.stringify({
-                    host: 'smtp.qq.com',
-                    port: 465,
-                    secure: true,
-                    auth: {
-                      user: envEmail,
-                      pass: envPass
-                    }
-                 })
-               }
-             })
-           }
-        }
-      } catch (e) {
-        console.error('[createCampaign] 更新默认账户配置失败:', e)
-      }
-    }
-
     // 如果没有找到默认账户，尝试查找任何已存在的账户
     if (!tempSenderAccount) {
       tempSenderAccount = await prisma.senderAccount.findFirst({
         where: { userId: tempUserId }
       })
-      
-      // 如果找到了非默认账户，也顺便更新一下
-      if (tempSenderAccount) {
-          try {
-             const envPass = process.env.QQ_SMTP_AUTH || ''
-             const envEmail = process.env.QQ_EMAIL || 'default@example.com'
-             if (envPass && envPass.length > 0) {
-                 tempSenderAccount = await prisma.senderAccount.update({
-                     where: { id: tempSenderAccount.id },
-                     data: {
-                        email: envEmail,
-                        smtpConfig: JSON.stringify({
-                            host: 'smtp.qq.com',
-                            port: 465,
-                            secure: true,
-                            auth: {
-                              user: envEmail,
-                              pass: envPass
-                            }
-                        })
-                     }
-                 })
-             }
-          } catch(e) {}
-      }
     }
 
     // 如果还是没有，创建一个临时账户（使用环境变量）
