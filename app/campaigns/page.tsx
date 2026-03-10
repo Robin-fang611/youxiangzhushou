@@ -196,7 +196,9 @@ export default function CampaignsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                        <Link href={`/campaigns/${campaign.id}/status`} className="hover:underline">
+                          <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                        </Link>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color} flex items-center gap-1`}>
                           <StatusIcon className="w-4 h-4 inline" />
                           {statusInfo.label}

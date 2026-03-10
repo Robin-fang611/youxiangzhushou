@@ -44,7 +44,10 @@ export default function CampaignStatusPage() {
           setLoading(false)
 
           // 触发批量发送
-          if (data.status === 'SENDING' && !isSendingRef.current) {
+          // 如果状态是 SENDING，自动继续发送
+          // 如果状态是 DRAFT，也自动触发发送（因为进入详情页通常意味着用户想要开始/查看发送）
+          // 后端 API 会处理状态转换（DRAFT -> SENDING）
+          if ((data.status === 'SENDING' || data.status === 'DRAFT') && !isSendingRef.current) {
             isSendingRef.current = true
             console.log('Triggering batch send...')
             fetch(`/api/campaigns/${params.id}/send-batch`, { method: 'POST' })
