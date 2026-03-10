@@ -487,18 +487,41 @@ export async function createCampaign(
       }
     })
 
-    const tempSenderAccount = await prisma.senderAccount.create({
-      data: {
+    // 尝试查找现有的默认发件账户
+    let tempSenderAccount = await prisma.senderAccount.findFirst({
+      where: { 
         userId: tempUserId,
-        name: '默认发件账户',
-        email: process.env.QQ_EMAIL || 'default@example.com',
-        smtpConfig: JSON.stringify({
-          host: 'smtp.qq.com',
-          port: 465,
-          secure: true
-        })
+        isDefault: true
       }
     })
+
+    // 如果没有找到默认账户，尝试查找任何已存在的账户
+    if (!tempSenderAccount) {
+      tempSenderAccount = await prisma.senderAccount.findFirst({
+        where: { userId: tempUserId }
+      })
+    }
+
+    // 如果还是没有，创建一个临时账户（使用环境变量）
+    if (!tempSenderAccount) {
+      tempSenderAccount = await prisma.senderAccount.create({
+        data: {
+          userId: tempUserId,
+          name: '默认发件账户',
+          email: process.env.QQ_EMAIL || 'default@example.com',
+          isDefault: true,
+          smtpConfig: JSON.stringify({
+            host: 'smtp.qq.com',
+            port: 465,
+            secure: true,
+            auth: {
+              user: process.env.QQ_EMAIL || 'default@example.com',
+              pass: process.env.QQ_SMTP_AUTH || ''
+            }
+          })
+        }
+      })
+    }
 
     const campaign = await prisma.campaign.create({
       data: {

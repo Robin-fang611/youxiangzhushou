@@ -16,11 +16,24 @@ export async function POST(
   try {
     // 1. 获取活动信息
     const campaign = await prisma.campaign.findUnique({
-      where: { id: campaignId }
+      where: { id: campaignId },
+      include: {
+        senderAccount: true
+      }
     })
 
     if (!campaign) {
       return NextResponse.json({ error: '活动不存在' }, { status: 404 })
+    }
+
+    // 解析发件账户配置
+    let smtpConfig = undefined
+    if (campaign.senderAccount?.smtpConfig) {
+      try {
+        smtpConfig = JSON.parse(campaign.senderAccount.smtpConfig)
+      } catch (e) {
+        console.error('解析 SMTP 配置失败:', e)
+      }
     }
 
     if (campaign.status !== 'SENDING' && campaign.status !== 'DRAFT') {
@@ -83,7 +96,13 @@ export async function POST(
         const subject = parseVariables(campaign.subject, variables)
         const body = parseVariables(campaign.body, variables)
         
-        const result = await emailService.sendEmail(contact.email, subject, body)
+        // 使用解析出的 smtpConfig 发送邮件
+        const result = await emailService.sendEmail(
+          contact.email, 
+          subject, 
+          body,
+          { smtpConfig }
+        )
         
         // 更新联系人状态
         await prisma.campaignContact.update({

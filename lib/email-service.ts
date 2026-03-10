@@ -338,11 +338,32 @@ export class EmailService {
       skipSpamCheck?: boolean
       headers?: Record<string, string>
       retryCount?: number
+      smtpConfig?: EmailConfig
     }
   ): Promise<EmailResult> {
     const maxRetries = options?.retryCount !== undefined ? options.retryCount : 2
     let lastError: Error | null = null
     
+    // 如果提供了 smtpConfig，使用临时 transporter
+    let currentTransporter = this.transporter
+    let currentConfig = this.config
+
+    if (options?.smtpConfig) {
+      console.log('[EmailService] 使用自定义 SMTP 配置发送')
+      currentConfig = { ...this.config, ...options.smtpConfig }
+      currentTransporter = nodemailer.createTransport({
+        host: currentConfig.host,
+        port: currentConfig.port,
+        secure: currentConfig.secure,
+        auth: currentConfig.auth,
+        pool: true,
+        maxConnections: 1, // 临时连接限制并发
+        maxMessages: 10,
+        rateLimit: 5,
+        rateDelta: 1000
+      })
+    }
+
     // 重试逻辑
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -397,17 +418,18 @@ export class EmailService {
         }
 
         // 4. 优化邮件内容
+        // 注意：optimizeContent 需要用到 currentConfig
         const { subject: optimizedSubject, body: optimizedBody, headers } = 
           this.optimizeContent(subject, body, to)
 
         // 5. 构造邮件选项
-        const fromName = options?.fromName || this.config.fromName || 'Business Bot'
-        const replyTo = options?.replyTo || this.config.replyTo || this.config.auth.user
+        const fromName = options?.fromName || currentConfig.fromName || 'Business Bot'
+        const replyTo = options?.replyTo || currentConfig.replyTo || currentConfig.auth.user
 
         const mailOptions: nodemailer.SendMailOptions = {
           from: {
             name: fromName,
-            address: this.config.auth.user
+            address: currentConfig.auth.user
           },
           to,
           subject: optimizedSubject,
@@ -419,16 +441,16 @@ export class EmailService {
             ...options?.headers
           },
           // 添加 Message-ID（符合 RFC 5322）
-          messageId: this.generateMessageId(this.config.auth.user.split('@')[1] || 'qq.com'),
+          messageId: this.generateMessageId(currentConfig.auth.user.split('@')[1] || 'qq.com'),
           // 添加退订头（RFC 8058）
           list: {
-            unsubscribe: `<mailto:${this.config.auth.user}?subject=unsubscribe>`
+            unsubscribe: `<mailto:${currentConfig.auth.user}?subject=unsubscribe>`
           }
         }
 
         // 6. 发送邮件
         console.log(`[EmailService] 正在发送邮件到 ${to} (尝试 ${attempt + 1}/${maxRetries + 1})`)
-        const info = await this.transporter.sendMail(mailOptions)
+        const info = await currentTransporter.sendMail(mailOptions)
         
         // 7. 更新发送记录
         this.sendCount.set(to, (this.sendCount.get(to) || 0) + 1)
@@ -446,6 +468,11 @@ export class EmailService {
           messageId: info.messageId,
           response: info.response
         })
+
+        // 如果是临时 transporter，关闭它
+        if (options?.smtpConfig) {
+            currentTransporter.close()
+        }
 
         return {
           success: true,
@@ -480,6 +507,13 @@ export class EmailService {
           console.log(`[EmailService] 将在 ${Math.pow(2, attempt + 1)} 秒后重试...`)
         }
       }
+    }
+    
+    // 如果是临时 transporter，关闭它
+    if (options?.smtpConfig && currentTransporter) {
+        try {
+            currentTransporter.close()
+        } catch (e) { console.error('Error closing temp transporter', e)}
     }
     
     // 所有重试都失败
