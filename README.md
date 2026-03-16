@@ -10,7 +10,7 @@
 
 **现代化、高效、可靠的批量邮件营销解决方案**
 
-[在线演示](#) | [快速开始](#-快速开始) | [功能特性](#-功能特性) | [部署指南](#-部署指南)
+[快速开始](#-快速开始) | [功能特性](#-功能特性) | [API 文档](#-api-文档) | [部署指南](#-部署指南)
 
 </div>
 
@@ -44,6 +44,7 @@
 - 📊 **实时监控**：完整的发送日志和统计数据，实时掌握营销效果
 - 🔒 **安全可靠**：Prisma ORM 防止 SQL 注入，环境变量隔离敏感信息
 - 💡 **易于使用**：现代化 UI 设计，三步完成邮件营销活动
+- 🤖 **AI 增强**：集成智能线索搜索和邮件生成功能
 
 ---
 
@@ -84,6 +85,13 @@
 - **连接测试**：一键测试 SMTP 连接状态
 - **限额管理**：每日发送限额设置和监控
 
+### 🤖 AI 线索搜索（新增）
+
+- **智能搜索**：基于 Serper API 的 Google 搜索
+- **AI 处理**：通义千问智能提取结构化线索
+- **邮箱验证**：三阶段邮箱验证（格式→MX→SMTP）
+- **同行管理**：同行公司信息管理
+
 ---
 
 ## 🛠️ 技术栈
@@ -109,6 +117,7 @@
 | PostgreSQL | - | 生产环境数据库 |
 | XLSX | 0.18.5 | Excel 文件解析 |
 | PapaParse | 5.5.3 | CSV 文件解析 |
+| OpenAI | ^4.28.0 | AI 模型调用 |
 
 ### 开发工具
 
@@ -162,6 +171,10 @@ JWT_SECRET="your-jwt-secret-at-least-32-characters-long"
 MAIL_PROVIDER=qq
 QQ_EMAIL=your_email@qq.com
 QQ_SMTP_AUTH=your_authorization_code
+
+# AI 服务配置（线索挖掘）
+QWEN_API_KEY=sk-your-qwen-api-key-here
+SERPER_API_KEY=your-serper-api-key-here
 
 # 运行环境
 NODE_ENV=development
@@ -246,6 +259,28 @@ DATABASE_URL="postgresql://user:password@host.neon.tech/dbname?sslmode=require"
 DIRECT_DATABASE_URL="postgresql://user:password@host.neon.tech/dbname?sslmode=require"
 ```
 
+### AI 服务配置
+
+#### 通义千问 API
+
+1. 访问 [阿里云 DashScope](https://dashscope.aliyun.com/)
+2. 注册并获取 API Key
+3. 配置环境变量：
+
+```env
+QWEN_API_KEY=sk-your-actual-key
+```
+
+#### Serper API
+
+1. 访问 [Serper.dev](https://serper.dev/)
+2. 注册并获取 API Key（免费额度 100 次/月）
+3. 配置环境变量：
+
+```env
+SERPER_API_KEY=your-actual-key
+```
+
 ---
 
 ## 📖 使用指南
@@ -318,6 +353,16 @@ lisi@example.com,李四,示例集团
 3. 实时查看发送进度
 4. 查看详细日志和统计数据
 
+### 使用 AI 线索搜索
+
+1. 访问 **线索** 页面
+2. 选择搜索类型（直客/同行）
+3. 输入关键词（如 "Electronics"）
+4. 点击"开始搜索"
+5. AI 自动处理并返回结构化线索
+6. 可选：启用邮箱深度验证
+7. 将线索导出或直接用于邮件发送
+
 ---
 
 ## 📁 项目结构
@@ -326,32 +371,61 @@ lisi@example.com,李四,示例集团
 营销系统/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API 路由
-│   │   ├── sender-accounts/    # 发件邮箱管理
-│   │   └── debug/             # 调试接口
+│   │   ├── campaigns/     # 营销活动 API
+│   │   ├── leads/         # 线索管理 API
+│   │   ├── peers/         # 同行公司 API
+│   │   └── sender-accounts/ # 发件账户 API
 │   ├── campaigns/         # 营销活动页面
-│   │   ├── new/              # 创建新活动
-│   │   └── [id]/             # 活动详情
+│   │   ├── [id]/          # 活动详情
+│   │   ├── new/           # 创建新活动
+│   │   └── page.tsx       # 活动列表
+│   ├── leads/             # 线索搜索页面
 │   ├── settings/          # 设置页面
 │   ├── help/              # 帮助页面
 │   ├── test/              # 测试页面
 │   ├── actions.ts         # Server Actions
-│   ├── batch-actions.ts   # 批量操作
-│   └── layout.tsx         # 根布局
-├── lib/                   # 工具库
-│   ├── prisma.ts         # Prisma 客户端
-│   ├── email-service.ts  # 邮件服务
-│   ├── utils.ts          # 工具函数
-│   └── constants.ts      # 常量定义
-├── prisma/               # 数据库
-│   ├── schema.prisma     # 数据库模型
-│   ├── schema.build.prisma  # 构建时 schema
-│   └── migrations/       # 迁移文件
-├── public/               # 静态资源
-├── .env.example          # 环境变量示例
-├── vercel.json           # Vercel 配置
-├── next.config.js        # Next.js 配置
-├── tailwind.config.ts    # Tailwind 配置
-└── package.json          # 项目依赖
+│   ├── error.tsx          # 错误边界
+│   ├── favicon.ico        # 网站图标
+│   ├── globals.css        # 全局样式
+│   ├── layout.tsx         # 根布局
+│   ├── loading.tsx        # 加载组件
+│   ├── page.tsx           # 首页
+│   └── test-actions.ts    # 测试操作
+├── components/            # React 组件
+│   └── ui/                # UI 组件库
+│       ├── badge.tsx      # 标签组件
+│       ├── button.tsx     # 按钮组件
+│       ├── card.tsx       # 卡片组件
+│       ├── checkbox.tsx   # 复选框
+│       ├── input.tsx      # 输入框
+│       ├── select.tsx     # 下拉选择框
+│       └── tabs.tsx       # 标签页
+├── lib/                   # 核心库
+│   ├── lead-search/       # 线索搜索模块
+│   │   ├── index.ts       # 统一导出
+│   │   ├── processor.ts   # AI 数据处理
+│   │   ├── searcher.ts    # 搜索服务
+│   │   └── verifier.ts    # 邮箱验证
+│   ├── constants.ts       # 常量定义
+│   ├── email-service.ts   # 邮件发送服务
+│   ├── prisma.ts          # Prisma 客户端
+│   └── utils.ts           # 工具函数
+├── prisma/                # 数据库
+│   ├── migrations/        # 数据库迁移
+│   ├── schema.build.prisma # 构建时 schema
+│   └── schema.prisma      # 数据模型定义
+├── public/                # 静态资源
+├── superlink-engine/      # 参考项目
+├── .env.example           # 环境变量示例
+├── .gitignore             # Git 忽略文件
+├── eslint.config.mjs      # ESLint 配置
+├── next.config.js         # Next.js 配置
+├── package-lock.json      # 依赖锁文件
+├── package.json           # 项目依赖
+├── postcss.config.js      # PostCSS 配置
+├── tailwind.config.ts     # Tailwind 配置
+├── tsconfig.json          # TypeScript 配置
+└── vercel.json            # Vercel 配置
 ```
 
 ---
@@ -415,13 +489,54 @@ lisi@example.com,李四,示例集团
 
 ### 营销活动
 
-#### POST /api/campaigns
+#### POST /api/campaigns/[id]/send-batch
 
-创建营销活动（通过 Server Actions）
+批量发送邮件
 
-#### GET /api/campaigns/[id]
+### 线索管理
 
-获取活动详情和状态
+#### POST /api/leads/search
+
+执行线索搜索任务
+
+**请求体**：
+```json
+{
+  "type": "direct_customer", // direct_customer | peer_company
+  "keywords": "Electronics",
+  "limit": 50
+}
+```
+
+#### POST /api/leads/verify
+
+批量验证邮箱
+
+**请求体**：
+```json
+{
+  "emails": ["test@example.com", "user@company.com"]
+}
+```
+
+### 同行管理
+
+#### GET /api/peers
+
+获取同行公司列表
+
+#### POST /api/peers
+
+创建同行公司
+
+**请求体**：
+```json
+{
+  "name": "同行公司",
+  "email": "contact@peer.com",
+  "website": "https://peer.com"
+}
+```
 
 ---
 
@@ -453,6 +568,8 @@ JWT_SECRET=your-jwt-secret
 MAIL_PROVIDER=qq
 QQ_EMAIL=your_email@qq.com
 QQ_SMTP_AUTH=your_auth_code
+QWEN_API_KEY=your-qwen-api-key
+SERPER_API_KEY=your-serper-api-key
 NODE_ENV=production
 ```
 
@@ -478,6 +595,7 @@ NODE_ENV=production
 - ✅ 设置页面可以添加邮箱
 - ✅ 可以创建营销活动
 - ✅ 发送邮件功能正常
+- ✅ 线索搜索功能正常
 
 ### 其他平台部署
 
@@ -515,9 +633,9 @@ npm start
 
 ```bash
 npm install -g pm2
-pm2 start npm --name "email-marketing" -- start
-pm2 save
-pm2 startup
+pm start pm2 start npm --name "email-marketing" -- start
+npm save pm2 save
+npm startup pm2 startup
 ```
 
 ---
@@ -538,26 +656,26 @@ pm2 startup
 - [ ] 点击率统计
 - [ ] A/B 测试功能
 
-### v2.3 - 用户系统（计划中）
+### v2.3 - AI 增强（计划中）
+
+- [ ] AI 邮件生成
+- [ ] 智能跟进系统
+- [ ] 客户意向识别
+- [ ] 自动营销流程
+
+### v2.4 - 用户系统（计划中）
 
 - [ ] 多用户支持
 - [ ] 角色权限管理
 - [ ] 团队协作功能
 - [ ] 操作日志审计
 
-### v2.4 - 数据分析（计划中）
+### v2.5 - 数据分析（计划中）
 
 - [ ] 数据可视化仪表板
 - [ ] 营销效果分析报告
 - [ ] 数据导出功能
 - [ ] API 接口开放
-
-### v3.0 - 企业版（规划中）
-
-- [ ] 私有化部署方案
-- [ ] 高可用架构
-- [ ] 集群部署支持
-- [ ] 专业技术支持
 
 ---
 
@@ -598,6 +716,8 @@ pm2 startup
 - [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
 - [Lucide](https://lucide.dev/) - 图标库
 - [Radix UI](https://www.radix-ui.com/) - UI 组件库
+- [Serper](https://serper.dev/) - Google 搜索 API
+- [通义千问](https://help.aliyun.com/zh/dashscope/) - AI 模型
 
 ---
 

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Mail, Users, BarChart3, Zap, ShieldCheck, FileText, CheckCircle, HelpCircle, Upload, Edit, Send, ArrowRight } from 'lucide-react'
+import { Mail, Users, BarChart3, Zap, ShieldCheck, FileText, CheckCircle, HelpCircle, Upload, Edit, Send, ArrowRight, Search, Building2 } from 'lucide-react'
 
 export default function Home() {
   return (
@@ -17,6 +17,13 @@ export default function Home() {
               <span className="text-lg font-semibold text-[#1f2329]">邮件营销系统</span>
             </div>
             <div className="flex items-center gap-3">
+              <Link 
+                href="/leads" 
+                className="bg-white hover:border-[#3370ff] hover:text-[#3370ff] text-[#1f2329] px-5 py-2 rounded-md text-sm font-medium inline-flex items-center gap-2 transition-all border border-[#dee0e3]"
+              >
+                <Search className="w-4 h-4" />
+                线索搜索
+              </Link>
               <Link 
                 href="/settings" 
                 className="bg-white hover:border-[#3370ff] hover:text-[#3370ff] text-[#1f2329] px-5 py-2 rounded-md text-sm font-medium inline-flex items-center gap-2 transition-all border border-[#dee0e3]"
