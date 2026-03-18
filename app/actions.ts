@@ -748,8 +748,10 @@ async function executeCampaign(campaignId: string) {
           failedCount = 0
         }
 
-        // 延迟 500ms（避免触发反垃圾机制）
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // 延迟发送（根据 SMTP 服务商调整间隔）
+        const provider = process.env.MAIL_PROVIDER || 'qq'
+        const delay = provider === 'qq' ? 2500 : provider === 'gmail' ? 1500 : 1000
+        await new Promise(resolve => setTimeout(resolve, delay))
       } catch (contactError: any) {
         console.error(`[executeCampaign] ${executionId} - 联系人错误:`, contactError)
         

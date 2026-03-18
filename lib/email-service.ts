@@ -32,14 +32,22 @@ interface SpamCheckResult {
 export class EmailService {
   private transporter: nodemailer.Transporter
   private config: EmailConfig
-  private sendCount: Map<string, number> = new Map() // 按收件人统计
-  private lastSendTime: Map<string, number> = new Map() // 按收件人统计
-  private domainReputation: Map<string, number> = new Map() // 域名信誉
+  private sendCount: Map<string, number> = new Map()
+  private lastSendTime: Map<string, number> = new Map()
+  private domainReputation: Map<string, number> = new Map()
+  
+  private sendDelay: number
+  private rateLimit: number
+  private rateDelta: number
 
   constructor(config?: Partial<EmailConfig>) {
     const provider = config?.provider || (process.env.MAIL_PROVIDER as any) || 'qq'
     
     let baseConfig: EmailConfig
+    let sendDelay: number
+    let rateLimit: number
+    let rateDelta: number
+    
     switch (provider) {
       case 'gmail':
         baseConfig = {
@@ -53,6 +61,9 @@ export class EmailService {
           },
           fromName: process.env.FROM_NAME || 'Business Bot'
         }
+        sendDelay = 1500
+        rateLimit = 5
+        rateDelta = 1000
         break
       case 'custom':
         baseConfig = {
@@ -66,6 +77,9 @@ export class EmailService {
           },
           fromName: process.env.FROM_NAME || 'Business Bot'
         }
+        sendDelay = 1000
+        rateLimit = 10
+        rateDelta = 1000
         break
       case 'qq':
       default:
@@ -80,12 +94,17 @@ export class EmailService {
           },
           fromName: process.env.FROM_NAME || 'Business Bot'
         }
+        sendDelay = 2500
+        rateLimit = 3
+        rateDelta = 1000
         break
     }
 
     this.config = { ...baseConfig, ...config }
+    this.sendDelay = sendDelay
+    this.rateLimit = rateLimit
+    this.rateDelta = rateDelta
     
-    // 优化 SMTP 配置，提高送达率
     this.transporter = nodemailer.createTransport({
       host: this.config.host,
       port: this.config.port,
@@ -93,13 +112,11 @@ export class EmailService {
       auth: this.config.auth,
       logger: true,
       debug: process.env.NODE_ENV === 'development',
-      // 连接池优化
       pool: true,
-      maxConnections: 5,
-      maxMessages: 100,
-      // 速率限制（避免触发反垃圾机制）
-      rateLimit: 10, // 每秒最多 10 封
-      rateDelta: 1000
+      maxConnections: 3,
+      maxMessages: 50,
+      rateLimit: this.rateLimit,
+      rateDelta: this.rateDelta
     })
   }
 
