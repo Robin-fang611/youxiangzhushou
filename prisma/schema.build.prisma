@@ -351,11 +351,102 @@ model UnsubscribeRecord {
 }
 
 // ==================== 系统配置 ====================
-
 model SystemConfig {
   id          String   @id @default(cuid())
   key         String   @unique
   value       String
   description String?
   updatedAt   DateTime @updatedAt
+}
+
+// ==================== 线索数据 (来自 superlink-engine) ====================
+model Lead {
+  id                String   @id @default(cuid())
+  userId            String?
+  companyName       String
+  location          String?
+  contactPerson     String?
+  email             String?
+  phone             String?
+  businessScope     String?
+  sourceUrl         String?
+  leadType          String   @default("direct_customer")
+  searchModule      String?
+  searchKeyword     String?
+  verificationStatus String  @default("pending")
+  verificationDetails String?
+  lastVerifiedAt    DateTime?
+  emailSentCount    Int      @default(0)
+  lastEmailSentAt   DateTime?
+  emailOpened       Boolean  @default(false)
+  emailReplied      Boolean  @default(false)
+  replyIntent       String?
+  notes             String?
+  tags              String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@unique([companyName, email])
+  @@index([leadType])
+  @@index([verificationStatus])
+  @@index([searchModule])
+  @@index([email])
+  @@index([companyName])
+}
+
+model LeadSearchTask {
+  id            String   @id @default(cuid())
+  userId        String?
+  taskName      String
+  keyword       String
+  searchModule  String
+  status        String   @default("pending")
+  totalResults  Int      @default(0)
+  processedResults Int   @default(0)
+  validLeads    Int      @default(0)
+  errorMessage  String?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([status])
+  @@index([searchModule])
+}
+
+model PeerCompany {
+  id               String   @id @default(cuid())
+  userId           String?
+  companyName      String
+  region           String?
+  scale            String?
+  mainRoutes       String?
+  weakRoutes       String?
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String
+  source           String?
+  cooperationLevel String   @default("POTENTIAL")
+  lastContactAt    DateTime?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@unique([companyName, contactEmail])
+  @@index([region])
+  @@index([mainRoutes])
+  @@index([cooperationLevel])
+}
+
+model EmailVerificationLog {
+  id          String   @id @default(cuid())
+  email       String
+  isValid     Boolean
+  stage       String
+  error       String?
+  details     String?
+  verifiedAt  DateTime @default(now())
+  
+  @@index([email])
+  @@index([isValid])
 }
