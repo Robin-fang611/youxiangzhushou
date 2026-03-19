@@ -40,7 +40,7 @@ Output Format: Return ONLY a valid JSON list of objects. No markdown, no explana
 
 export class LeadProcessor {
   private openai: OpenAI | null = null
-  private provider: 'openai' | 'zhipu' = 'openai'
+  private provider: 'openai' | 'zhipu' | 'qwen' = 'openai'
 
   constructor() {
     const qwenKey = process.env.QWEN_API_KEY
