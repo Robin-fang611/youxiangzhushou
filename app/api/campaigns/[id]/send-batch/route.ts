@@ -3,9 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { emailService } from '@/lib/email-service'
 import { parseVariables } from '@/lib/utils'
 
-export const dynamic = 'force-dynamic' // 禁用静态缓存
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // Vercel Serverless 函数最大超时 60 秒
 
-const BATCH_SIZE = 5 // 每次处理 5 封，避免 Vercel 10s 超时
+const BATCH_SIZE = 1 // 每次只处理 1 封，确保稳定性
+const SEND_DELAY_MS = 3000 // QQ 邮箱间隔 3 秒，避免触发频率限制
 
 export async function POST(
   request: NextRequest,
@@ -82,11 +84,11 @@ export async function POST(
       })
     }
 
-    // 3. 处理发送
+    // 3. 处理发送 - 改为串行发送，确保稳定性
     let successCount = 0
     let failedCount = 0
     
-    const results = await Promise.all(contacts.map(async (contact) => {
+    for (const contact of contacts) {
       try {
         const variables = {
           name: contact.name || '',
@@ -96,12 +98,15 @@ export async function POST(
         const subject = parseVariables(campaign.subject, variables)
         const body = parseVariables(campaign.body, variables)
         
-        // 使用解析出的 smtpConfig 发送邮件
+        // 使用解析出的 smtpConfig 发送邮件，增加重试次数
         const result = await emailService.sendEmail(
           contact.email, 
           subject, 
           body,
-          { smtpConfig }
+          { 
+            smtpConfig,
+            retryCount: 5 // 增加到 5 次重试
+          }
         )
         
         // 更新联系人状态
@@ -126,7 +131,16 @@ export async function POST(
           }
         })
         
-        return result.success
+        if (result.success) {
+          successCount++
+        } else {
+          failedCount++
+        }
+        
+        // 发送延迟，避免触发频率限制
+        if (contacts.indexOf(contact) < contacts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS))
+        }
       } catch (error: any) {
         console.error(`发送给 ${contact.email} 失败:`, error)
         
@@ -138,12 +152,14 @@ export async function POST(
             }
         })
         
-        return false
+        failedCount++
+        
+        // 错误后也要延迟
+        if (contacts.indexOf(contact) < contacts.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS))
+        }
       }
-    }))
-    
-    successCount = results.filter(r => r).length
-    failedCount = results.filter(r => !r).length
+    }
 
     // 4. 更新活动统计
     const updatedCampaign = await prisma.campaign.update({

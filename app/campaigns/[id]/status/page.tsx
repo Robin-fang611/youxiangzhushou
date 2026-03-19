@@ -31,6 +31,8 @@ export default function CampaignStatusPage() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null
     let isMounted = true
+    let lastSendTime = 0
+    const MIN_SEND_INTERVAL = 3000 // 最小发送间隔 3 秒
 
     const pollStatus = async () => {
       try {
@@ -43,26 +45,29 @@ export default function CampaignStatusPage() {
           setError('')
           setLoading(false)
 
-          // 触发批量发送
-          // 如果状态是 SENDING，自动继续发送
-          // 如果状态是 DRAFT，也自动触发发送（因为进入详情页通常意味着用户想要开始/查看发送）
-          // 后端 API 会处理状态转换（DRAFT -> SENDING）
+          // 触发批量发送 - 添加频率限制
           if ((data.status === 'SENDING' || data.status === 'DRAFT') && !isSendingRef.current) {
-            isSendingRef.current = true
-            console.log('Triggering batch send...')
-            fetch(`/api/campaigns/${params.id}/send-batch`, { method: 'POST' })
-              .then(res => res.json())
-              .then(result => {
-                console.log('Batch send result:', result)
-              })
-              .catch(err => {
-                console.error('Batch send error:', err)
-              })
-              .finally(() => {
-                if (isMounted) {
-                  isSendingRef.current = false
-                }
-              })
+            const now = Date.now()
+            if (now - lastSendTime >= MIN_SEND_INTERVAL) {
+              isSendingRef.current = true
+              lastSendTime = now
+              console.log('Triggering batch send...')
+              fetch(`/api/campaigns/${params.id}/send-batch`, { method: 'POST' })
+                .then(res => res.json())
+                .then(result => {
+                  console.log('Batch send result:', result)
+                })
+                .catch(err => {
+                  console.error('Batch send error:', err)
+                })
+                .finally(() => {
+                  if (isMounted) {
+                    isSendingRef.current = false
+                  }
+                })
+            } else {
+              console.log('Skipping batch send - too soon')
+            }
           }
 
           if (data.status === 'COMPLETED' || data.status === 'FAILED') {

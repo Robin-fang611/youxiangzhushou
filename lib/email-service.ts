@@ -358,12 +358,14 @@ export class EmailService {
       smtpConfig?: EmailConfig
     }
   ): Promise<EmailResult> {
-    const maxRetries = options?.retryCount !== undefined ? options.retryCount : 2
+    const maxRetries = options?.retryCount !== undefined ? options.retryCount : 5
     let lastError: Error | null = null
+    let lastResult: EmailResult | null = null
     
     // 如果提供了 smtpConfig，使用临时 transporter
     let currentTransporter = this.transporter
     let currentConfig = this.config
+    let isTempTransporter = false
 
     if (options?.smtpConfig) {
       console.log('[EmailService] 使用自定义 SMTP 配置发送')
@@ -374,20 +376,23 @@ export class EmailService {
         secure: currentConfig.secure,
         auth: currentConfig.auth,
         pool: true,
-        maxConnections: 1, // 临时连接限制并发
+        maxConnections: 1,
         maxMessages: 10,
-        rateLimit: 5,
-        rateDelta: 1000
+        rateLimit: 3,
+        rateDelta: 1000,
+        connectionTimeout: 10000,
+        socketTimeout: 30000
       })
+      isTempTransporter = true
     }
 
-    // 重试逻辑
+    // 重试逻辑 - 增强版
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         if (attempt > 0) {
-          console.log(`[EmailService] 重试发送 (${attempt + 1}/${maxRetries + 1}) 到 ${to}`)
-          // 重试前等待：指数退避 (1s, 2s, 4s...)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+          const waitTime = Math.min(Math.pow(2, attempt) * 1000, 10000)
+          console.log(`[EmailService] 重试发送 (${attempt + 1}/${maxRetries + 1}) 到 ${to}，等待 ${waitTime}ms`)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
         }
         
         // 1. 速率限制检查
@@ -510,18 +515,44 @@ export class EmailService {
         // 检查是否为认证错误（不重试）
         if (errorMessage.includes('535') || errorMessage.includes('authentication') || errorMessage.includes('Invalid login')) {
           console.error('[EmailService] 认证错误，停止重试:', errorMessage)
-          break // 认证错误不重试
+          return {
+            success: false,
+            error: errorMessage,
+            spamScore: 0,
+            suggestions: ['SMTP 认证失败，请检查邮箱账号和授权码是否正确', '查看 SMTP_SETUP_GUIDE.md 获取配置指南']
+          }
         }
         
         // 检查是否为网络错误（可重试）
         if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('socket')) {
           console.log('[EmailService] 网络错误，准备重试...')
-          continue // 网络错误继续重试
+          lastResult = {
+            success: false,
+            error: errorMessage,
+            spamScore: 0,
+            suggestions: ['网络连接不稳定，正在重试...']
+          }
+          continue
         }
         
-        // 其他错误，根据情况重试
-        if (attempt < maxRetries) {
-          console.log(`[EmailService] 将在 ${Math.pow(2, attempt + 1)} 秒后重试...`)
+        // 检查是否为频率限制错误（重点处理）
+        if (errorMessage.includes('421') || errorMessage.includes('too many connections') || errorMessage.includes('rate limit')) {
+          console.log('[EmailService] 触发频率限制，延长等待时间...')
+          lastResult = {
+            success: false,
+            error: errorMessage,
+            spamScore: 0,
+            suggestions: ['发送频率过高，已自动延长等待时间']
+          }
+          continue
+        }
+        
+        // 其他错误，保存结果并继续重试
+        lastResult = {
+          success: false,
+          error: errorMessage,
+          spamScore: 0,
+          suggestions: []
         }
       }
     }
@@ -534,6 +565,11 @@ export class EmailService {
     }
     
     // 所有重试都失败
+    if (lastResult) {
+      // 使用最后一次重试的结果
+      return lastResult
+    }
+    
     const errorMessage = lastError instanceof Error ? lastError.message : 'Unknown error'
     
     // 分析错误类型
